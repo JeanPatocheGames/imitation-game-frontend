@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Enregistre ta voix</title>
+</head>
+<body>
+  <h1>Enregistre ta voix</h1>
+  <button id="startBtn">Commencer l'enregistrement</button>
+  <button id="stopBtn" disabled>Arrêter</button>
+  <p id="status"></p>
+  <audio id="audioPlayback" controls></audio>
+
+  <script>
+    let mediaRecorder;
+    let audioChunks = [];
+
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const audioPlayback = document.getElementById('audioPlayback');
+
+    startBtn.onclick = async () => {
+      if (!navigator.mediaDevices) {
+        alert('Votre navigateur ne supporte pas la capture audio.');
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorder.start();
+      status.textContent = 'Enregistrement en cours...';
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+      mediaRecorder.onstop = e => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        audioPlayback.src = audioUrl;
+        status.textContent = 'Enregistrement terminé. Écoutez ci-dessous.';
+      };
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    };
+
+    stopBtn.onclick = () => {
+      mediaRecorder.stop();
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    };
+  </script>
+</body>
+</html>
