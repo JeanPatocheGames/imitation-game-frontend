@@ -54,6 +54,10 @@
     background: black;
     margin-bottom: 10px;
   }
+  #recordedAudio {
+    margin-bottom: 10px;
+    max-width: 100%;
+  }
   #roundInfo {
     font-size: 24px;
     margin-bottom: 10px;
@@ -96,6 +100,7 @@
       <source src="" type="video/mp4" />
       Ton navigateur ne supporte pas la vidéo.
     </video>
+    <audio id="recordedAudio" controls style="display:none;"></audio>
     <div id="controls">
       <button id="startRec">Démarrer l'enregistrement</button>
       <button id="stopRec" disabled>Arrêter</button>
@@ -133,6 +138,7 @@
   const gameDiv = document.getElementById("game");
   const roundInfo = document.getElementById("roundInfo");
   const video = document.getElementById("video");
+  const recordedAudio = document.getElementById("recordedAudio");
   const startRec = document.getElementById("startRec");
   const stopRec = document.getElementById("stopRec");
   const resetRec = document.getElementById("resetRec");
@@ -178,7 +184,6 @@
   function showLobby() {
     lobbyDiv.style.display = "block";
     gameDiv.style.display = "none";
-    // Affiche boutons d'enregistrement, vote cachés en lobby
     showRecordingControls(true);
     showVoteButtons(false);
   }
@@ -186,7 +191,6 @@
   function showGame() {
     lobbyDiv.style.display = "none";
     gameDiv.style.display = "flex";
-    // Affiche boutons d'enregistrement et vote selon phase
     showRecordingControls(true);
     showVoteButtons(false);
   }
@@ -258,6 +262,12 @@
     mediaRecorder.onstop = e => {
       resetRec.disabled = false;
       validateRec.disabled = false;
+
+      // Affiche le player audio avec l'enregistrement
+      const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      recordedAudio.src = audioUrl;
+      recordedAudio.style.display = "block";
     };
   };
 
@@ -273,6 +283,9 @@
     stopRec.disabled = true;
     resetRec.disabled = true;
     validateRec.disabled = true;
+
+    recordedAudio.src = "";
+    recordedAudio.style.display = "none";
   };
 
   validateRec.onclick = () => {
@@ -328,9 +341,11 @@
     votePlus.disabled = false;
     voteMinus.disabled = false;
 
-    // Par défaut on montre l’UI d’enregistrement, cache votes
     showRecordingControls(true);
     showVoteButtons(false);
+
+    recordedAudio.src = "";
+    recordedAudio.style.display = "none";
   }
 
   // Gérer le passage à la phase écoute
@@ -346,10 +361,7 @@
 
     roundInfo.textContent = `Phase d'écoute - Round ${round}`;
 
-    // On cache les contrôles d'enregistrement
     showRecordingControls(false);
-
-    // On affiche les boutons de vote
     showVoteButtons(true);
 
     // TODO : afficher la liste des enregistrements audio des joueurs (à recevoir du backend)
