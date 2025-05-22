@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Imitation Game</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+  video { width: 100%; max-height: 300px; background: black; }
+  button { margin: 10px 5px 20px; padding: 10px 20px; font-size: 16px; }
+  #score { font-size: 24px; margin-top: 20px; }
+  audio { width: 100%; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Imitation Game</h1>
+
+<video id="videoToImitate" controls>
+  <source src="https://sample-videos.com/video123/mp4/480/asdasdas.mp4" type="video/mp4" />
+  Ton navigateur ne supporte pas la vidéo.
+</video>
+
+<div>
+  <button id="startBtn">Démarrer l'enregistrement</button>
+  <button id="stopBtn" disabled>Arrêter</button>
+</div>
+
+<p id="status">Statut : prêt</p>
+
+<audio id="audioPlayback" controls></audio>
+
+<div id="score"></div>
+
+<script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
+<script>
+  const backendURL = 'https://imitation-game-server.onrender.com'; // Change avec ton URL Render
+  const socket = io(backendURL);
+
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const status = document.getElementById('status');
+  const audioPlayback = document.getElementById('audioPlayback');
+  const scoreDiv = document.getElementById('score');
+  const video = document.getElementById('videoToImitate');
+
+  let mediaRecorder;
+  let audioChunks = [];
+
+  startBtn.onclick = async () => {
+    if (!navigator.mediaDevices) {
+      alert('Votre navigateur ne supporte pas la capture audio.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.start();
+      status.textContent = 'Enregistrement en cours...';
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = e => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        audioPlayback.src = audioUrl;
+
+        // Envoie l'audio au backend
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64data = reader.result.split(',')[1];
+          socket.emit('audioData', { audio: base64data });
+          status.textContent = 'Audio envoyé, en attente du score...';
+        };
+        reader.readAsDataURL(audioBlob);
+      };
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    } catch (err) {
+      alert('Erreur lors de la capture audio: ' + err.message);
+    }
+  };
+
+  stopBtn.onclick = () => {
+    mediaRecorder.stop();
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  };
+
+  // Réception du score du backend
+  socket.on('scoreResult', data => {
+    scoreDiv.textContent = `Résultat : ${data.score}`;
+    status.textContent = 'Prêt pour un nouveau tour.';
+  });
+
+  socket.on('connect', () => {
+    status.textContent = 'Connecté au serveur.';
+  });
+
+  socket.on('disconnect', () => {
+    status.textContent = 'Déconnecté du serveur.';
+  });
+</script>
+
+</body>
+</html>
