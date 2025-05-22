@@ -6,7 +6,6 @@
 <title>Darons Imitation Game</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins&display=swap');
-
   body {
     margin: 0; padding: 0;
     font-family: 'Poppins', sans-serif;
@@ -17,7 +16,6 @@
     flex-direction: column;
     align-items: center;
   }
-
   #loginScreen, #gameScreen {
     background: rgba(0,0,0,0.75);
     border-radius: 12px;
@@ -48,7 +46,6 @@
   #loginScreen button:hover {
     background: #1e88e5;
   }
-
   #gameScreen {
     display: none;
     max-width: 1000px;
@@ -56,7 +53,6 @@
     display: flex;
     gap: 20px;
   }
-
   #players {
     width: 280px;
     background: #222;
@@ -86,7 +82,6 @@
     justify-content: space-between;
     font-weight: 600;
   }
-
   #main {
     flex: 1;
     background: #111;
@@ -96,13 +91,31 @@
     flex-direction: column;
     align-items: center;
   }
-
   #roundInfo {
     font-size: 28px;
     margin-bottom: 20px;
     font-weight: 700;
   }
-
+  #roundSetSelection {
+    margin-bottom: 25px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  #roundSetSelection button {
+    background: #42a5f5;
+    border: none;
+    color: white;
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  #roundSetSelection button.selected {
+    background: #1e88e5;
+    font-weight: 700;
+  }
   #videoContainer {
     position: relative;
     width: 100%;
@@ -112,13 +125,11 @@
     border-radius: 12px;
     overflow: hidden;
   }
-
   iframe {
     width: 100%;
     height: 100%;
     border: none;
   }
-
   #playerAudio {
     margin-top: 15px;
     width: 100%;
@@ -126,14 +137,12 @@
     outline: none;
     border-radius: 6px;
   }
-
   #controls, .voteButtons {
     margin-top: 25px;
     display: flex;
     justify-content: center;
     gap: 12px;
   }
-
   button {
     background: #42a5f5;
     border: none;
@@ -151,7 +160,6 @@
   button:hover:not(:disabled) {
     background: #1e88e5;
   }
-
   /* Glow animation for vote buttons */
   @keyframes voteGlow {
     0% {
@@ -170,7 +178,6 @@
   .vote-anim {
     animation: voteGlow 0.5s ease forwards;
   }
-
   /* Toast notification style */
   #toast {
     position: fixed;
@@ -211,6 +218,12 @@
       <h1>Salle d'attente</h1>
       <p>Liste des joueurs :</p>
       <ul id="lobbyPlayerList"></ul>
+
+      <div id="roundSetSelection" style="display:none;">
+        <button id="btnRound1" data-set="round1">ROUND 1</button>
+        <button id="btnRound2" data-set="round2">ROUND 2</button>
+      </div>
+
       <button id="startGameBtn" style="display:none;">Démarrer la partie</button>
     </div>
 
@@ -253,9 +266,8 @@
 
   let listenOrder = [];
   let listenIndex = 0;
-  let usedTopVotes = 0; // Limite 1 TOP par manche
+  let usedTopVotes = 0;
 
-  // Elements DOM
   const loginScreen = document.getElementById("loginScreen");
   const gameScreen = document.getElementById("gameScreen");
   const playerList = document.getElementById("playerList");
@@ -276,10 +288,12 @@
   const nextPlayerBtn = document.getElementById("nextPlayerBtn");
   const pseudoInput = document.getElementById("pseudoInput");
   const joinBtn = document.getElementById("joinBtn");
+  const roundSetSelection = document.getElementById("roundSetSelection");
+  const btnRound1 = document.getElementById("btnRound1");
+  const btnRound2 = document.getElementById("btnRound2");
   const voteButtonsDiv = document.querySelector('.voteButtons');
 
-  // Socket initialisé après login
-  let socket = null;
+  let socket;
 
   joinBtn.onclick = () => {
     const val = pseudoInput.value.trim();
@@ -303,19 +317,27 @@
       alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
       if (res.isAdmin) {
         startGameBtn.style.display = "inline-block";
+        roundSetSelection.style.display = "flex";
       }
     });
 
     setupSocketEvents();
+  };
 
-    // Branche bouton start game ici, après socket initialisé
-    startGameBtn.onclick = () => {
-      if (socket) {
-        socket.emit("startGame");
-      } else {
-        alert("Socket non initialisé, veuillez vous reconnecter.");
-      }
-    };
+  btnRound1.onclick = () => selectRoundSet("round1");
+  btnRound2.onclick = () => selectRoundSet("round2");
+
+  function selectRoundSet(set) {
+    btnRound1.classList.remove("selected");
+    btnRound2.classList.remove("selected");
+    if (set === "round1") btnRound1.classList.add("selected");
+    else if (set === "round2") btnRound2.classList.add("selected");
+
+    socket.emit("selectRoundSet", set);
+  }
+
+  startGameBtn.onclick = () => {
+    socket.emit("startGame");
   };
 
   function setupSocketEvents() {
@@ -348,7 +370,7 @@
       playerAudio.src = "";
       ytVideo.src = "";
 
-      if(data.phase === "imitation") {
+      if (data.phase === "imitation") {
         ytVideo.src = convertToEmbedUrl(data.videoURL) + "?autoplay=1&mute=1&enablejsapi=1";
         showRecordingControls(true);
       } else {
@@ -382,7 +404,7 @@
       nextPlayerBtn.style.display = "none";
       nextPlayerBtn.onclick = () => {
         listenIndex++;
-        if(listenIndex >= listenOrder.length) {
+        if (listenIndex >= listenOrder.length) {
           showToast("Phase d'écoute terminée !");
           voteButtonsDiv.style.display = "none";
           nextPlayerBtn.style.display = "none";
@@ -397,21 +419,12 @@
 
     socket.on("updateListeningPhase", ({ listenIndex: idx }) => {
       listenIndex = idx;
-      if(listenIndex >= listenOrder.length) {
-        showToast("Phase d'écoute terminée !");
-        voteButtonsDiv.style.display = "none";
-        nextPlayerBtn.style.display = "none";
-        playerAudio.style.display = "none";
-        ytVideo.src = "";
-        showLobby(true);
-        return;
-      }
       showListeningPhase();
     });
 
     socket.on("gameEnded", (finalScores) => {
-      alert("Partie terminée ! Classement final:\n" + 
-        Object.entries(finalScores).map(([p,s]) => `${p}: ${s} pts`).join("\n"));
+      alert("Partie terminée ! Classement final:\n" +
+        Object.entries(finalScores).map(([p, s]) => `${p}: ${s} pts`).join("\n"));
       location.reload();
     });
   }
@@ -421,7 +434,7 @@
     players.forEach(p => {
       const li = document.createElement("li");
       li.textContent = `${p.pseudo} (${p.score} pts)`;
-      if(p.isAdmin) li.textContent += " [ADMIN]";
+      if (p.isAdmin) li.textContent += " [ADMIN]";
       playerList.appendChild(li);
     });
   }
@@ -435,12 +448,12 @@
     });
   }
 
-  function showLobby(show=true) {
+  function showLobby(show = true) {
     lobbyDiv.style.display = show ? "block" : "none";
     gameDiv.style.display = show ? "none" : "flex";
   }
 
-  function showGame(show=true) {
+  function showGame(show = true) {
     lobbyDiv.style.display = show ? "none" : "block";
     gameDiv.style.display = show ? "flex" : "none";
   }
@@ -459,24 +472,22 @@
   function convertToEmbedUrl(url) {
     try {
       let vidId = null;
-      if(url.includes("youtube.com/shorts/")) {
+      if (url.includes("youtube.com/shorts/")) {
         vidId = url.split("youtube.com/shorts/")[1].split(/[?&]/)[0];
-      } else if(url.includes("youtube.com/watch?v=")) {
+      } else if (url.includes("youtube.com/watch?v=")) {
         vidId = url.split("v=")[1].split(/[?&]/)[0];
-      } else if(url.includes("youtu.be/")) {
+      } else if (url.includes("youtu.be/")) {
         vidId = url.split("youtu.be/")[1].split(/[?&]/)[0];
       }
-      if(vidId) return `https://www.youtube.com/embed/${vidId}`;
+      if (vidId) return `https://www.youtube.com/embed/${vidId}`;
       return url;
     } catch {
       return url;
     }
   }
 
-  // Enregistrement audio
-
   startRec.onclick = async () => {
-    if(!navigator.mediaDevices) {
+    if (!navigator.mediaDevices) {
       alert("Votre navigateur ne supporte pas la capture audio.");
       return;
     }
@@ -518,12 +529,8 @@
   };
 
   validateRec.onclick = () => {
-    if(!playerAudio.src) {
+    if (!playerAudio.src) {
       alert("Vous devez enregistrer quelque chose d'abord !");
-      return;
-    }
-    if (listenOrder[listenIndex]?.pseudo === pseudo) {
-      showToast("Vous ne pouvez pas voter pour vous-même !");
       return;
     }
     const reader = new FileReader();
@@ -544,8 +551,6 @@
     resetRec.disabled = disabled;
     validateRec.disabled = disabled;
   }
-
-  // Phase écoute + votes
 
   function showListeningPhase() {
     const currentPlayer = listenOrder[listenIndex];
@@ -573,17 +578,16 @@
   }
 
   function vote(type) {
-    if(hasVoted) return;
+    if (hasVoted) return;
 
-    // Empêche de voter pour soi-même
-    if (listenOrder[listenIndex]?.pseudo === pseudo) {
+    if (listenOrder[listenIndex].pseudo === pseudo) {
       showToast("Vous ne pouvez pas voter pour vous-même !");
       return;
     }
 
     hasVoted = true;
 
-    if(type === "TOP") usedTopVotes++;
+    if (type === "TOP") usedTopVotes++;
 
     voteTop.disabled = (usedTopVotes >= 1);
     votePlus.disabled = true;
@@ -598,9 +602,23 @@
     });
   }
 
+  socket && socket.on("updateListeningPhase", ({ listenIndex: idx }) => {
+    listenIndex = idx;
+    if (listenIndex >= listenOrder.length) {
+      showToast("Phase d'écoute terminée !");
+      voteButtonsDiv.style.display = "none";
+      nextPlayerBtn.style.display = "none";
+      playerAudio.style.display = "none";
+      ytVideo.src = "";
+      showLobby(true);
+      return;
+    }
+    showListeningPhase();
+  });
+
   nextPlayerBtn.onclick = () => {
     listenIndex++;
-    if(listenIndex >= listenOrder.length) {
+    if (listenIndex >= listenOrder.length) {
       showToast("Phase d'écoute terminée !");
       voteButtonsDiv.style.display = "none";
       nextPlayerBtn.style.display = "none";
@@ -618,7 +636,6 @@
     voteMinus.disabled = false;
   }
 
-  // Toast notification
   function showToast(msg) {
     const toast = document.getElementById("toast");
     toast.textContent = msg;
