@@ -2,65 +2,96 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<title>Imitation Game - Round</title>
+<title>Imitation Game</title>
 <style>
   body {
     font-family: Arial, sans-serif;
     margin: 0; padding: 0;
-    display: flex; height: 100vh; background: #222;
+    background: #222;
     color: white;
+    display: flex; height: 100vh;
   }
   #players {
-    width: 250px; background: #333; padding: 10px;
+    width: 250px;
+    background: #333;
+    padding: 10px;
     overflow-y: auto;
   }
   #players h2 {
     margin-top: 0;
   }
   #players ul {
-    list-style: none; padding: 0;
+    list-style: none;
+    padding: 0;
   }
   #players li {
-    margin: 5px 0; padding: 5px;
-    background: #444; border-radius: 5px;
-    display: flex; justify-content: space-between;
-    align-items: center;
+    margin: 5px 0;
+    padding: 5px;
+    background: #444;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
   }
   #main {
-    flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
+    flex: 1;
     padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  #lobby {
+    text-align: center;
+  }
+  #game {
+    display: none;
+    flex-direction: column;
+    align-items: center;
   }
   video {
-    max-width: 100%; max-height: 50vh;
+    max-width: 100%;
+    max-height: 50vh;
     background: black;
+    margin-bottom: 10px;
   }
   #roundInfo {
-    font-size: 24px; margin-bottom: 10px;
+    font-size: 24px;
+    margin-bottom: 10px;
   }
-  #controls {
-    margin-top: 10px;
-  }
-  button {
-    padding: 10px 20px; margin: 0 5px;
-    font-size: 16px; border: none; border-radius: 5px;
+  #controls button {
+    margin: 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
     cursor: pointer;
   }
-  button:disabled {
-    background: #555; cursor: default;
+  #controls button:disabled {
+    background: #555;
+    cursor: default;
   }
   .voteButtons button {
-    margin-top: 10px;
+    margin: 10px 5px 0 5px;
   }
 </style>
 </head>
 <body>
-  <div id="players">
-    <h2>Classement</h2>
-    <ul id="playerList"></ul>
+
+<div id="players">
+  <h2>Classement</h2>
+  <ul id="playerList"></ul>
+</div>
+
+<div id="main">
+  <div id="lobby">
+    <h1>Salle d'attente</h1>
+    <p>Liste des joueurs :</p>
+    <ul id="lobbyPlayerList"></ul>
+    <button id="startGameBtn" style="display:none;">Démarrer la partie</button>
   </div>
-  <div id="main">
-    <div id="roundInfo">Round 1 / 3</div>
+
+  <div id="game">
+    <div id="roundInfo"></div>
     <video id="video" controls muted>
       <source src="" type="video/mp4" />
       Ton navigateur ne supporte pas la vidéo.
@@ -71,16 +102,17 @@
       <button id="resetRec" disabled>Recommencer</button>
       <button id="validateRec" disabled>C'est parfait</button>
     </div>
-    <div class="voteButtons" style="margin-top:20px;">
+    <div class="voteButtons">
       <button id="voteTop">TOP (+2)</button>
       <button id="votePlus">+1</button>
       <button id="voteMinus">-1</button>
     </div>
   </div>
+</div>
 
 <script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
 <script>
-  const socket = io("https://imitation-game-server-uz6b.onrender.com"); // Remplace par ton backend
+  const socket = io("https://imitation-game-server-uz6b.onrender.com"); // Remplace par ton backend Render
 
   let pseudo = prompt("Entrez votre pseudo :");
   while (!pseudo || pseudo.trim().length < 2) {
@@ -88,17 +120,17 @@
   }
   pseudo = pseudo.trim();
 
-  socket.emit("joinGame", pseudo, (res) => {
-    if (!res.success) {
-      alert("Erreur : " + res.message);
-      location.reload();
-    } else {
-      alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
-    }
-  });
+  let gameStarted = false;
+  let hasVoted = false;
+  let mediaRecorder;
+  let audioChunks = [];
 
-  // UI Elements
+  // Elements DOM
   const playerList = document.getElementById("playerList");
+  const lobbyPlayerList = document.getElementById("lobbyPlayerList");
+  const startGameBtn = document.getElementById("startGameBtn");
+  const lobbyDiv = document.getElementById("lobby");
+  const gameDiv = document.getElementById("game");
   const roundInfo = document.getElementById("roundInfo");
   const video = document.getElementById("video");
   const startRec = document.getElementById("startRec");
@@ -109,10 +141,19 @@
   const votePlus = document.getElementById("votePlus");
   const voteMinus = document.getElementById("voteMinus");
 
-  let mediaRecorder;
-  let audioChunks = [];
-  let hasVoted = false;
+  socket.emit("joinGame", pseudo, (res) => {
+    if (!res.success) {
+      alert("Erreur : " + res.message);
+      location.reload();
+    } else {
+      alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
+      if (res.isAdmin) {
+        startGameBtn.style.display = "inline-block";
+      }
+    }
+  });
 
+  // Affiche liste joueurs avec score
   function updatePlayerList(players) {
     playerList.innerHTML = "";
     players.forEach(p => {
@@ -123,16 +164,55 @@
     });
   }
 
+  // Affiche liste joueurs dans lobby (juste les pseudos)
+  function updateLobbyPlayers(players) {
+    lobbyPlayerList.innerHTML = "";
+    players.forEach(pseudo => {
+      const li = document.createElement("li");
+      li.textContent = pseudo;
+      lobbyPlayerList.appendChild(li);
+    });
+  }
+
+  // Montre ou cache lobby / game
+  function showLobby() {
+    lobbyDiv.style.display = "block";
+    gameDiv.style.display = "none";
+  }
+
+  function showGame() {
+    lobbyDiv.style.display = "none";
+    gameDiv.style.display = "flex";
+  }
+
+  // Event listeners
+
+  startGameBtn.onclick = () => {
+    socket.emit("startGame");
+  };
+
   socket.on("playersUpdate", updatePlayerList);
+
+  socket.on("lobbyUpdate", ({ players, gameStarted: started }) => {
+    updateLobbyPlayers(players);
+    if (started) {
+      gameStarted = true;
+      showGame();
+    } else {
+      gameStarted = false;
+      showLobby();
+    }
+  });
+
+  socket.on("gameStarted", () => {
+    gameStarted = true;
+    showGame();
+  });
 
   socket.on("roundUpdate", data => {
     roundInfo.textContent = `Round ${data.currentRound} / ${data.totalRounds}`;
     video.src = data.videoURL;
     resetRecordingUI();
-  });
-
-  socket.on("gameStarted", () => {
-    alert("La partie a commencé !");
   });
 
   // Enregistrement audio (simple)
@@ -156,66 +236,4 @@
     };
     mediaRecorder.onstop = e => {
       resetRec.disabled = false;
-      validateRec.disabled = false;
-    };
-  };
-
-  stopRec.onclick = () => {
-    if (mediaRecorder) mediaRecorder.stop();
-    startRec.disabled = false;
-    stopRec.disabled = true;
-  };
-
-  resetRec.onclick = () => {
-    audioChunks = [];
-    startRec.disabled = false;
-    stopRec.disabled = true;
-    resetRec.disabled = true;
-    validateRec.disabled = true;
-  };
-
-  validateRec.onclick = () => {
-    // Ici, on simule l'envoi de l'imitation au backend
-    socket.emit("validateImitation", pseudo);
-    alert("Imitation validée !");
-    validateRec.disabled = true;
-  };
-
-  // Votes
-
-  function disableVoteButtons() {
-    voteTop.disabled = true;
-    votePlus.disabled = true;
-    voteMinus.disabled = true;
-  }
-
-  voteTop.onclick = () => {
-    if (hasVoted) return alert("Vous avez déjà voté ce round.");
-    socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "TOP" });
-    disableVoteButtons();
-    hasVoted = true;
-  };
-  votePlus.onclick = () => {
-    if (hasVoted) return alert("Vous avez déjà voté ce round.");
-    socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "+1" });
-    disableVoteButtons();
-    hasVoted = true;
-  };
-  voteMinus.onclick = () => {
-    if (hasVoted) return alert("Vous avez déjà voté ce round.");
-    socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "-1" });
-    disableVoteButtons();
-    hasVoted = true;
-  };
-
-  function resetRecordingUI() {
-    startRec.disabled = false;
-    stopRec.disabled = true;
-    resetRec.disabled = true;
-    validateRec.disabled = true;
-    hasVoted = false;
-    disableVoteButtons();
-  }
-</script>
-</body>
-</html>
+      validateRec
