@@ -2,64 +2,66 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<title>Imitation Game - Animations et Vote</title>
+<title>Imitation Game - Frontend corrigé</title>
 <style>
+  /* Design amélioré simple et propre */
   body {
-    font-family: Arial, sans-serif;
+    font-family: 'Poppins', Arial, sans-serif;
     margin: 0; padding: 0;
-    background: linear-gradient(135deg, #1e3c72, #2a5298);
-    color: white;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
     height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
   }
   #loginScreen, #gameScreen {
-    background: rgba(0,0,0,0.7);
-    border-radius: 10px;
+    background: rgba(0,0,0,0.75);
+    border-radius: 12px;
     padding: 30px 40px;
-    width: 320px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    width: 350px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.6);
     text-align: center;
   }
   #loginScreen input {
     width: 100%;
-    padding: 12px 10px;
-    margin: 15px 0 20px 0;
-    font-size: 16px;
-    border-radius: 6px;
+    padding: 12px 15px;
+    margin: 20px 0 25px 0;
+    font-size: 17px;
+    border-radius: 8px;
     border: none;
   }
   #loginScreen button {
-    background: #00b894;
+    background: #42a5f5;
     border: none;
-    padding: 12px 25px;
+    padding: 14px 30px;
     font-size: 18px;
-    border-radius: 6px;
+    border-radius: 8px;
     color: white;
     cursor: pointer;
     transition: background 0.3s ease;
   }
   #loginScreen button:hover {
-    background: #019971;
+    background: #1e88e5;
   }
   #gameScreen {
     display: none;
-    flex-direction: row;
-    height: 90vh;
-    max-width: 1200px;
+    max-width: 900px;
     width: 100%;
+    display: flex;
+    flex-direction: row;
   }
   #players {
-    width: 250px;
-    background: #333;
-    padding: 15px;
+    width: 260px;
+    background: #222;
+    padding: 20px;
+    border-radius: 12px 0 0 12px;
     overflow-y: auto;
-    border-radius: 10px 0 0 10px;
   }
   #players h2 {
     margin-top: 0;
     font-size: 24px;
+    margin-bottom: 15px;
   }
   #players ul {
     list-style: none;
@@ -67,32 +69,34 @@
     margin: 0;
   }
   #players li {
-    margin: 8px 0;
-    padding: 8px 10px;
-    background: #444;
-    border-radius: 5px;
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    background: #333;
+    border-radius: 8px;
     display: flex;
     justify-content: space-between;
+    font-weight: 600;
   }
   #main {
     flex: 1;
-    background: #222;
+    background: #111;
+    border-radius: 0 12px 12px 0;
     padding: 30px;
-    border-radius: 0 10px 10px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
   }
   #roundInfo {
     font-size: 28px;
-    margin-bottom: 15px;
-    font-weight: bold;
+    margin-bottom: 20px;
+    font-weight: 700;
   }
   video {
-    max-width: 100%;
+    width: 100%;
     max-height: 50vh;
-    border-radius: 10px;
+    border-radius: 12px;
     background: black;
+    outline: none;
   }
   audio {
     margin-top: 15px;
@@ -101,25 +105,25 @@
     border-radius: 6px;
   }
   #controls, .voteButtons {
-    margin-top: 20px;
+    margin-top: 25px;
   }
-  #controls button, .voteButtons button, #nextPlayerBtn {
-    background: #0984e3;
+  button {
+    background: #42a5f5;
     border: none;
     color: white;
-    padding: 12px 22px;
+    padding: 14px 28px;
     font-size: 16px;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
-    margin: 0 6px 10px 6px;
+    margin: 0 8px 12px 8px;
     transition: background 0.3s ease;
   }
-  #controls button:disabled, .voteButtons button:disabled, #nextPlayerBtn:disabled {
+  button:disabled {
     background: #555;
     cursor: not-allowed;
   }
-  #controls button:hover:not(:disabled), .voteButtons button:hover:not(:disabled), #nextPlayerBtn:hover:not(:disabled) {
-    background: #74b9ff;
+  button:hover:not(:disabled) {
+    background: #1e88e5;
   }
   #nextPlayerBtn {
     margin-top: 30px;
@@ -312,6 +316,15 @@
 
     // Gestion votes
     socket.on("playersUpdate", updatePlayerList);
+
+    socket.on("gameEnded", (finalScores) => {
+      alert("Partie terminée ! Voici le classement final:\n" + 
+        Object.entries(finalScores)
+          .map(([p, s]) => `${p} : ${s} pts`)
+          .join("\n")
+      );
+      location.reload();
+    });
   }
 
   // Affiche liste joueurs avec score
@@ -335,39 +348,17 @@
     });
   }
 
-  // Montre ou cache lobby / game
   function showLobby() {
     lobbyDiv.style.display = "block";
     gameDiv.style.display = "none";
-    showRecordingControls(true);
-    showVoteButtons(false);
-    nextPlayerBtn.style.display = "none";
   }
 
   function showGame() {
     lobbyDiv.style.display = "none";
     gameDiv.style.display = "flex";
-    showRecordingControls(true);
-    showVoteButtons(false);
-    nextPlayerBtn.style.display = "none";
   }
 
-  // Contrôles d'enregistrement
-  function showRecordingControls(show) {
-    startRec.style.display = show ? "inline-block" : "none";
-    stopRec.style.display = show ? "inline-block" : "none";
-    resetRec.style.display = show ? "inline-block" : "none";
-    validateRec.style.display = show ? "inline-block" : "none";
-  }
-
-  // Contrôles votes
-  function showVoteButtons(show) {
-    voteTop.style.display = show ? "inline-block" : "none";
-    votePlus.style.display = show ? "inline-block" : "none";
-    voteMinus.style.display = show ? "inline-block" : "none";
-  }
-
-  // Enregistrement audio (simple)
+  // Enregistrement audio
 
   startRec.onclick = async () => {
     if (!navigator.mediaDevices) {
@@ -382,6 +373,7 @@
     stopRec.disabled = false;
     resetRec.disabled = true;
     validateRec.disabled = true;
+    recordedAudio.style.display = "none";
 
     mediaRecorder.ondataavailable = e => {
       audioChunks.push(e.data);
@@ -389,159 +381,135 @@
     mediaRecorder.onstop = e => {
       resetRec.disabled = false;
       validateRec.disabled = false;
-
-      // Affiche le player audio avec l'enregistrement
-      const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+      recordedAudio.style.display = "block";
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       const audioUrl = URL.createObjectURL(audioBlob);
       recordedAudio.src = audioUrl;
-      recordedAudio.style.display = "block";
     };
   };
 
   stopRec.onclick = () => {
-    if (mediaRecorder) mediaRecorder.stop();
+    mediaRecorder.stop();
     startRec.disabled = false;
     stopRec.disabled = true;
   };
 
   resetRec.onclick = () => {
     audioChunks = [];
-    startRec.disabled = false;
-    stopRec.disabled = true;
-    resetRec.disabled = true;
-    validateRec.disabled = true;
-
     recordedAudio.src = "";
     recordedAudio.style.display = "none";
+    resetRec.disabled = true;
+    validateRec.disabled = true;
   };
 
   validateRec.onclick = () => {
-    if (audioChunks.length === 0) {
-      alert("Aucun enregistrement à valider !");
+    if (!recordedAudio.src) {
+      alert("Vous devez enregistrer quelque chose d'abord !");
       return;
     }
-    const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+    // Envoi au backend
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64Audio = reader.result.split(",")[1]; // On récupère la partie base64
+    reader.onload = () => {
+      const base64Audio = reader.result;
       socket.emit("validateImitation", { pseudo, audio: base64Audio });
-      alert("Imitation validée !");
-      validateRec.disabled = true;
+      showToast("Imitation validée, en attente des autres joueurs...");
+      disableRecordButtons(true);
     };
-    reader.readAsDataURL(audioBlob);
+    fetch(recordedAudio.src)
+      .then(res => res.blob())
+      .then(blob => reader.readAsDataURL(blob));
   };
 
-  // Votes
+  function disableRecordButtons(disabled) {
+    startRec.disabled = disabled;
+    stopRec.disabled = true;
+    resetRec.disabled = disabled;
+    validateRec.disabled = disabled;
+  }
 
-  function disableVoteButtons() {
+  // Phase d'écoute avec votes
+
+  function showListeningPhase(round) {
+    showGame();
+    lobbyDiv.style.display = "none";
+    gameDiv.style.display = "flex";
+    roundInfo.textContent = `Phase d'écoute Manche ${round} - ${listenOrder[listenIndex].pseudo}`;
+
+    // Video mute
+    video.muted = true;
+    video.src = listenOrder[listenIndex].videoURL || "";
+
+    // Audio de l'imitation (joueur)
+    recordedAudio.src = `data:${listenOrder[listenIndex].audio}`;
+    recordedAudio.style.display = "block";
+    recordedAudio.play();
+
+    // Afficher boutons vote
+    voteTop.disabled = false;
+    votePlus.disabled = false;
+    voteMinus.disabled = false;
+    nextPlayerBtn.style.display = "none";
+    hasVoted = false;
+
+    voteTop.onclick = () => vote("TOP");
+    votePlus.onclick = () => vote("+1");
+    voteMinus.onclick = () => vote("-1");
+
+    nextPlayerBtn.onclick = () => {
+      listenIndex++;
+      if (listenIndex >= listenOrder.length) {
+        // Fin de phase d'écoute, on désactive tout
+        showToast("Phase d'écoute terminée !");
+        gameDiv.style.display = "none";
+        lobbyDiv.style.display = "block";
+        nextPlayerBtn.style.display = "none";
+        voteTop.disabled = true;
+        votePlus.disabled = true;
+        voteMinus.disabled = true;
+        // Attente du round suivant côté serveur
+        return;
+      }
+      showListeningPhase(round);
+    };
+  }
+
+  function vote(type) {
+    if (hasVoted) return;
+    hasVoted = true;
     voteTop.disabled = true;
     votePlus.disabled = true;
     voteMinus.disabled = true;
+    nextPlayerBtn.style.display = "inline-block";
+
+    socket.emit("vote", { voter: pseudo, target: listenOrder[listenIndex].pseudo, voteType: type });
+    showToast(`Vous avez voté ${type} pour ${listenOrder[listenIndex].pseudo}`);
+    // animation glow
+    [voteTop, votePlus, voteMinus].forEach(btn => btn.classList.remove("vote-anim"));
+    const btn = type === "TOP" ? voteTop : type === "+1" ? votePlus : voteMinus;
+    btn.classList.add("vote-anim");
   }
 
-  // Animation + toast helper
-  function showToast(message) {
+  // Toast notification
+  function showToast(msg) {
     const toast = document.getElementById("toast");
-    toast.textContent = message;
+    toast.textContent = msg;
     toast.classList.add("show");
     setTimeout(() => {
       toast.classList.remove("show");
     }, 2500);
   }
 
-  function animateVoteButton(button) {
-    button.classList.add("vote-anim");
-    button.addEventListener("animationend", () => {
-      button.classList.remove("vote-anim");
-    }, { once: true });
-  }
-
-  voteTop.onclick = () => {
-    if (hasVoted) return alert("Vous avez déjà voté ce round.");
-    socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "TOP" });
-    animateVoteButton(voteTop);
-    showToast("Vote TOP enregistré !");
-    disableVoteButtons();
-    hasVoted = true;
-  };
-  votePlus.onclick = () => {
-    if (hasVoted) return alert("Vous avez déjà voté ce round.");
-    socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "+1" });
-    animateVoteButton(votePlus);
-    showToast("Vote +1 enregistré !");
-    disableVoteButtons();
-    hasVoted = true;
-  };
-  voteMinus.onclick = () => {
-    if (hasVoted) return alert("Vous avez déjà voté ce round.");
-    socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "-1" });
-    animateVoteButton(voteMinus);
-    showToast("Vote -1 enregistré !");
-    disableVoteButtons();
-    hasVoted = true;
-  };
-
   function resetRecordingUI() {
-    startRec.disabled = false;
-    stopRec.disabled = true;
-    resetRec.disabled = true;
-    validateRec.disabled = true;
-    hasVoted = false;
-    voteTop.disabled = false;
-    votePlus.disabled = false;
-    voteMinus.disabled = false;
-
-    showRecordingControls(true);
-    showVoteButtons(false);
-    nextPlayerBtn.style.display = "none";
-
+    disableRecordButtons(false);
     recordedAudio.src = "";
     recordedAudio.style.display = "none";
+    resetRec.disabled = true;
+    validateRec.disabled = true;
   }
 
-  // Phase écoute
-
-  socket.on("startListeningPhase", ({ round, listenOrder: order }) => {
-    showToast(`Phase d'écoute du round ${round} commencée !`);
-    listenOrder = order;
-    listenIndex = 0;
-    showListeningPhase(round);
-  });
-
-  function showListeningPhase(round) {
-    lobbyDiv.style.display = "none";
-    gameDiv.style.display = "flex";
-
-    roundInfo.textContent = `Phase d'écoute Manche ${round} - Joueur : ${listenOrder[listenIndex].pseudo}`;
-
-    showRecordingControls(false);
-    showVoteButtons(true);
-
-    // Vidéo en mute
-    video.muted = true;
-    video.play();
-
-    // Audio enregistré du joueur en écoute
-    recordedAudio.style.display = "block";
-    recordedAudio.src = `data:audio/webm;base64,${listenOrder[listenIndex].audio}`;
-    recordedAudio.play();
-
-    // Affichage bouton "Joueur suivant"
-    nextPlayerBtn.style.display = "inline-block";
-    nextPlayerBtn.disabled = false;
-    nextPlayerBtn.onclick = () => {
-      listenIndex++;
-      if (listenIndex >= listenOrder.length) {
-        showToast("Fin de la phase d'écoute !");
-        nextPlayerBtn.disabled = true;
-        // Ici, tu peux déclencher la prochaine manche ou fin de jeu
-      } else {
-        roundInfo.textContent = `Phase d'écoute Manche ${round} - Joueur : ${listenOrder[listenIndex].pseudo}`;
-        recordedAudio.src = `data:audio/webm;base64,${listenOrder[listenIndex].audio}`;
-        recordedAudio.play();
-      }
-    };
-  }
+  startGameBtn.onclick = () => {
+    socket.emit("startGame");
+  };
 </script>
 
 </body>
