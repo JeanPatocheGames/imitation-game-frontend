@@ -6,6 +6,7 @@
 <title>Darons Imitation Game</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins&display=swap');
+
   body {
     margin: 0; padding: 0;
     font-family: 'Poppins', sans-serif;
@@ -16,6 +17,7 @@
     flex-direction: column;
     align-items: center;
   }
+
   #loginScreen, #gameScreen {
     background: rgba(0,0,0,0.75);
     border-radius: 12px;
@@ -46,6 +48,15 @@
   #loginScreen button:hover {
     background: #1e88e5;
   }
+
+  /* Centrer le texte de bienvenue en deux lignes */
+  #welcomeText {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 10px;
+  }
+
   #gameScreen {
     display: none;
     max-width: 1000px;
@@ -53,6 +64,7 @@
     display: flex;
     gap: 20px;
   }
+
   #players {
     width: 280px;
     background: #222;
@@ -81,7 +93,17 @@
     display: flex;
     justify-content: space-between;
     font-weight: 600;
+    align-items: center;
   }
+  #players li .checkmark {
+    color: #4caf50;
+    font-weight: bold;
+    margin-left: 8px;
+  }
+  #players li.admin {
+    background: #1a237e;
+  }
+
   #main {
     flex: 1;
     background: #111;
@@ -91,31 +113,13 @@
     flex-direction: column;
     align-items: center;
   }
+
   #roundInfo {
     font-size: 28px;
     margin-bottom: 20px;
     font-weight: 700;
   }
-  #roundSetSelection {
-    margin-bottom: 25px;
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
-  #roundSetSelection button {
-    background: #42a5f5;
-    border: none;
-    color: white;
-    padding: 12px 24px;
-    font-size: 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.3s ease;
-  }
-  #roundSetSelection button.selected {
-    background: #1e88e5;
-    font-weight: 700;
-  }
+
   #videoContainer {
     position: relative;
     width: 100%;
@@ -125,11 +129,13 @@
     border-radius: 12px;
     overflow: hidden;
   }
+
   iframe {
     width: 100%;
     height: 100%;
     border: none;
   }
+
   #playerAudio {
     margin-top: 15px;
     width: 100%;
@@ -137,12 +143,14 @@
     outline: none;
     border-radius: 6px;
   }
+
   #controls, .voteButtons {
     margin-top: 25px;
     display: flex;
     justify-content: center;
     gap: 12px;
   }
+
   button {
     background: #42a5f5;
     border: none;
@@ -160,6 +168,7 @@
   button:hover:not(:disabled) {
     background: #1e88e5;
   }
+
   /* Glow animation for vote buttons */
   @keyframes voteGlow {
     0% {
@@ -178,6 +187,7 @@
   .vote-anim {
     animation: voteGlow 0.5s ease forwards;
   }
+
   /* Toast notification style */
   #toast {
     position: fixed;
@@ -198,12 +208,37 @@
     opacity: 1;
     pointer-events: auto;
   }
+
+  /* Timer style */
+  #voteTimer {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.7);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 16px;
+    color: #ffeb3b;
+    user-select: none;
+  }
+
+  /* Admin controls container */
+  #adminControls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    justify-content: center;
+  }
 </style>
 </head>
 <body>
 
 <div id="loginScreen">
-  <h1>Bienvenue au Darons Imitation Game</h1>
+  <div id="welcomeText">
+    <div>Bienvenue au</div>
+    <div><strong>Darons Imitation Game</strong></div>
+  </div>
   <input type="text" id="pseudoInput" placeholder="Entrez votre pseudo" autocomplete="off" />
   <button id="joinBtn">Rejoindre la partie</button>
 </div>
@@ -219,19 +254,19 @@
       <p>Liste des joueurs :</p>
       <ul id="lobbyPlayerList"></ul>
 
-      <div id="roundSetSelection" style="display:none;">
-        <button id="btnRound1" data-set="round1">ROUND 1</button>
-        <button id="btnRound2" data-set="round2">ROUND 2</button>
+      <div id="adminControls" style="display:none;">
+        <button id="startGameBtn">Démarrer la partie</button>
+        <button id="restartGameBtn">Redémarrer la partie</button>
+        <button id="skipMancheBtn">Sauter la manche</button>
       </div>
-
-      <button id="startGameBtn" style="display:none;">Démarrer la partie</button>
     </div>
 
-    <div id="game" style="display:none; flex-direction: column; align-items: center; width: 100%;">
+    <div id="game" style="display:none; flex-direction: column; align-items: center; width: 100%; position: relative;">
       <div id="roundInfo"></div>
-      
+
       <div id="videoContainer">
         <iframe id="ytVideo" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        <div id="voteTimer" style="display:none;">20</div>
       </div>
 
       <audio id="playerAudio" controls style="display:none;"></audio>
@@ -263,16 +298,20 @@
   let hasVoted = false;
   let mediaRecorder;
   let audioChunks = [];
-
   let listenOrder = [];
   let listenIndex = 0;
   let usedTopVotes = 0;
+  let voteTimerInterval = null;
+  let voteTimerCount = 20;
 
   const loginScreen = document.getElementById("loginScreen");
   const gameScreen = document.getElementById("gameScreen");
   const playerList = document.getElementById("playerList");
   const lobbyPlayerList = document.getElementById("lobbyPlayerList");
   const startGameBtn = document.getElementById("startGameBtn");
+  const restartGameBtn = document.getElementById("restartGameBtn");
+  const skipMancheBtn = document.getElementById("skipMancheBtn");
+  const adminControls = document.getElementById("adminControls");
   const lobbyDiv = document.getElementById("lobby");
   const gameDiv = document.getElementById("game");
   const roundInfo = document.getElementById("roundInfo");
@@ -288,10 +327,8 @@
   const nextPlayerBtn = document.getElementById("nextPlayerBtn");
   const pseudoInput = document.getElementById("pseudoInput");
   const joinBtn = document.getElementById("joinBtn");
-  const roundSetSelection = document.getElementById("roundSetSelection");
-  const btnRound1 = document.getElementById("btnRound1");
-  const btnRound2 = document.getElementById("btnRound2");
   const voteButtonsDiv = document.querySelector('.voteButtons');
+  const voteTimerDiv = document.getElementById("voteTimer");
 
   let socket;
 
@@ -312,46 +349,30 @@
       if (!res.success) {
         alert("Erreur : " + res.message);
         location.reload();
-        return;
-      }
-      alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
-      if (res.isAdmin) {
-        startGameBtn.style.display = "inline-block";
-        roundSetSelection.style.display = "flex";
+      } else {
+        alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
+        if (res.isAdmin) {
+          adminControls.style.display = "flex";
+        }
       }
     });
 
     setupSocketEvents();
   };
 
-  btnRound1.onclick = () => selectRoundSet("round1");
-  btnRound2.onclick = () => selectRoundSet("round2");
-
-  function selectRoundSet(set) {
-    btnRound1.classList.remove("selected");
-    btnRound2.classList.remove("selected");
-    if (set === "round1") btnRound1.classList.add("selected");
-    else if (set === "round2") btnRound2.classList.add("selected");
-
-    socket.emit("selectRoundSet", set);
-  }
-
-  startGameBtn.onclick = () => {
-    socket.emit("startGame");
-  };
-
   function setupSocketEvents() {
     socket.on("playersUpdate", updatePlayerList);
+
     socket.on("lobbyUpdate", ({ players, gameStarted: started }) => {
       updateLobbyPlayers(players);
-      if (started) {
-        gameStarted = true;
+      gameStarted = started;
+      if (gameStarted) {
         showGame();
       } else {
-        gameStarted = false;
         showLobby();
       }
     });
+
     socket.on("gameStarted", () => {
       gameStarted = true;
       showGame();
@@ -370,12 +391,13 @@
       playerAudio.src = "";
       ytVideo.src = "";
 
-      if (data.phase === "imitation") {
+      if(data.phase === "imitation") {
         ytVideo.src = convertToEmbedUrl(data.videoURL) + "?autoplay=1&mute=1&enablejsapi=1";
         showRecordingControls(true);
       } else {
         showRecordingControls(false);
       }
+      updatePlayerListValidations();
     });
 
     socket.on("startListeningPhase", ({ round, manche, listenOrder: order, listenIndex: idx }) => {
@@ -383,10 +405,12 @@
       listenIndex = idx || 0;
       usedTopVotes = 0;
       hasVoted = false;
+
       voteButtonsDiv.style.display = "flex";
       nextPlayerBtn.style.display = "none";
       showLobby(false);
       showGame(true);
+
       roundInfo.textContent = `Phase d'écoute - Round ${round} Manche ${manche} - Écoute de ${listenOrder[listenIndex].pseudo}`;
 
       ytVideo.src = convertToEmbedUrl(listenOrder[listenIndex].videoURL) + "?autoplay=1&mute=1&enablejsapi=1";
@@ -397,45 +421,99 @@
 
       resetVoteButtons();
 
+      voteTop.disabled = false;
+      votePlus.disabled = false;
+      voteMinus.disabled = false;
+
       voteTop.onclick = () => vote("TOP");
       votePlus.onclick = () => vote("+1");
       voteMinus.onclick = () => vote("-1");
 
       nextPlayerBtn.style.display = "none";
-      nextPlayerBtn.onclick = () => {
-        listenIndex++;
-        if (listenIndex >= listenOrder.length) {
-          showToast("Phase d'écoute terminée !");
-          voteButtonsDiv.style.display = "none";
-          nextPlayerBtn.style.display = "none";
-          playerAudio.style.display = "none";
-          ytVideo.src = "";
-          showLobby(true);
-          return;
-        }
-        showListeningPhase();
-      };
+
+      startVoteTimer();
     });
 
     socket.on("updateListeningPhase", ({ listenIndex: idx }) => {
       listenIndex = idx;
+      if (listenIndex >= listenOrder.length) {
+        stopVoteTimer();
+        showToast("Phase d'écoute terminée !");
+        voteButtonsDiv.style.display = "none";
+        nextPlayerBtn.style.display = "none";
+        playerAudio.style.display = "none";
+        ytVideo.src = "";
+        showLobby(true);
+        return;
+      }
       showListeningPhase();
+      startVoteTimer();
     });
 
     socket.on("gameEnded", (finalScores) => {
-      alert("Partie terminée ! Classement final:\n" +
-        Object.entries(finalScores).map(([p, s]) => `${p}: ${s} pts`).join("\n"));
+      stopVoteTimer();
+      alert("Partie terminée ! Classement final:\n" + 
+        Object.entries(finalScores).map(([p,s]) => `${p}: ${s} pts`).join("\n"));
+      location.reload();
+    });
+
+    socket.on("gameRestarted", () => {
+      stopVoteTimer();
+      alert("La partie a été redémarrée par l'admin.");
+      location.reload();
+    });
+
+    socket.on("kicked", () => {
+      alert("Vous avez été kické par l'admin.");
       location.reload();
     });
   }
+
+  // Gestion des boutons admin
+  startGameBtn.onclick = () => {
+    if(socket) socket.emit("startGame");
+  };
+  restartGameBtn.onclick = () => {
+    if(socket) socket.emit("restartGame");
+  };
+  skipMancheBtn.onclick = () => {
+    if(socket) socket.emit("skipManche");
+  };
+
+  // Fonctions d'interface
 
   function updatePlayerList(players) {
     playerList.innerHTML = "";
     players.forEach(p => {
       const li = document.createElement("li");
       li.textContent = `${p.pseudo} (${p.score} pts)`;
-      if (p.isAdmin) li.textContent += " [ADMIN]";
+      if (p.validated) {
+        const checkmark = document.createElement("span");
+        checkmark.classList.add("checkmark");
+        checkmark.textContent = "✓";
+        li.appendChild(checkmark);
+      }
+      if(p.isAdmin) li.classList.add("admin");
       playerList.appendChild(li);
+    });
+  }
+
+  function updatePlayerListValidations() {
+    // Met à jour seulement le checkmark des validations
+    const lis = playerList.querySelectorAll("li");
+    if(!listenOrder.length) return;
+    lis.forEach(li => {
+      const pseudo = li.textContent.split(" (")[0];
+      const validated = listenOrder.some(p => p.pseudo === pseudo && p.audio);
+      const checkmark = li.querySelector(".checkmark");
+      if(validated && !checkmark) {
+        const span = document.createElement("span");
+        span.classList.add("checkmark");
+        span.textContent = "✓";
+        li.appendChild(span);
+      } else if (!validated && checkmark) {
+        checkmark.remove();
+      }
     });
   }
 
@@ -448,12 +526,12 @@
     });
   }
 
-  function showLobby(show = true) {
+  function showLobby(show=true) {
     lobbyDiv.style.display = show ? "block" : "none";
     gameDiv.style.display = show ? "none" : "flex";
   }
 
-  function showGame(show = true) {
+  function showGame(show=true) {
     lobbyDiv.style.display = show ? "none" : "block";
     gameDiv.style.display = show ? "flex" : "none";
   }
@@ -469,25 +547,28 @@
     validateRec.style.display = show ? "inline-block" : "none";
   }
 
+  // Convertit url youtube shorts ou normales vers embed youtube
   function convertToEmbedUrl(url) {
     try {
       let vidId = null;
-      if (url.includes("youtube.com/shorts/")) {
+      if(url.includes("youtube.com/shorts/")) {
         vidId = url.split("youtube.com/shorts/")[1].split(/[?&]/)[0];
-      } else if (url.includes("youtube.com/watch?v=")) {
+      } else if(url.includes("youtube.com/watch?v=")) {
         vidId = url.split("v=")[1].split(/[?&]/)[0];
-      } else if (url.includes("youtu.be/")) {
+      } else if(url.includes("youtu.be/")) {
         vidId = url.split("youtu.be/")[1].split(/[?&]/)[0];
       }
-      if (vidId) return `https://www.youtube.com/embed/${vidId}`;
+      if(vidId) return `https://www.youtube.com/embed/${vidId}`;
       return url;
     } catch {
       return url;
     }
   }
 
+  // Enregistrement audio
+
   startRec.onclick = async () => {
-    if (!navigator.mediaDevices) {
+    if(!navigator.mediaDevices) {
       alert("Votre navigateur ne supporte pas la capture audio.");
       return;
     }
@@ -529,7 +610,7 @@
   };
 
   validateRec.onclick = () => {
-    if (!playerAudio.src) {
+    if(!playerAudio.src) {
       alert("Vous devez enregistrer quelque chose d'abord !");
       return;
     }
@@ -551,6 +632,8 @@
     resetRec.disabled = disabled;
     validateRec.disabled = disabled;
   }
+
+  // Phase écoute + votes
 
   function showListeningPhase() {
     const currentPlayer = listenOrder[listenIndex];
@@ -575,6 +658,8 @@
 
     nextPlayerBtn.style.display = "none";
     nextPlayerBtn.onclick = null;
+
+    startVoteTimer();
   }
 
   function vote(type) {
@@ -587,7 +672,7 @@
 
     hasVoted = true;
 
-    if (type === "TOP") usedTopVotes++;
+    if(type === "TOP") usedTopVotes++;
 
     voteTop.disabled = (usedTopVotes >= 1);
     votePlus.disabled = true;
@@ -600,31 +685,21 @@
       target: listenOrder[listenIndex].pseudo,
       voteType: type
     });
-  }
 
-  socket && socket.on("updateListeningPhase", ({ listenIndex: idx }) => {
-    listenIndex = idx;
-    if (listenIndex >= listenOrder.length) {
-      showToast("Phase d'écoute terminée !");
-      voteButtonsDiv.style.display = "none";
-      nextPlayerBtn.style.display = "none";
-      playerAudio.style.display = "none";
-      ytVideo.src = "";
-      showLobby(true);
-      return;
-    }
-    showListeningPhase();
-  });
+    stopVoteTimer();
+    nextPlayerBtn.style.display = "inline-block";
+  }
 
   nextPlayerBtn.onclick = () => {
     listenIndex++;
-    if (listenIndex >= listenOrder.length) {
+    if(listenIndex >= listenOrder.length) {
       showToast("Phase d'écoute terminée !");
       voteButtonsDiv.style.display = "none";
       nextPlayerBtn.style.display = "none";
       playerAudio.style.display = "none";
       ytVideo.src = "";
       showLobby(true);
+      stopVoteTimer();
       return;
     }
     showListeningPhase();
@@ -636,6 +711,36 @@
     voteMinus.disabled = false;
   }
 
+  function startVoteTimer() {
+    voteTimerCount = 20;
+    voteTimerDiv.style.display = "block";
+    voteTimerDiv.textContent = voteTimerCount;
+    if(voteTimerInterval) clearInterval(voteTimerInterval);
+
+    voteTimerInterval = setInterval(() => {
+      voteTimerCount--;
+      voteTimerDiv.textContent = voteTimerCount;
+      if(voteTimerCount <= 0) {
+        clearInterval(voteTimerInterval);
+        voteTimerDiv.style.display = "none";
+        // Auto skip manche si joueur n'a pas voté
+        if(!hasVoted) {
+          showToast("Temps écoulé, manche suivante.");
+          nextPlayerBtn.click();
+        }
+      }
+    }, 1000);
+  }
+
+  function stopVoteTimer() {
+    if(voteTimerInterval) {
+      clearInterval(voteTimerInterval);
+      voteTimerInterval = null;
+    }
+    voteTimerDiv.style.display = "none";
+  }
+
+  // Toast notification
   function showToast(msg) {
     const toast = document.getElementById("toast");
     toast.textContent = msg;
@@ -643,12 +748,21 @@
     setTimeout(() => toast.classList.remove("show"), 2500);
   }
 
-  function resetRecordingUI() {
-    disableRecordButtons(false);
-    playerAudio.src = "";
-    playerAudio.style.display = "none";
-    resetRec.disabled = true;
-    validateRec.disabled = true;
+  function convertToEmbedUrl(url) {
+    try {
+      let vidId = null;
+      if(url.includes("youtube.com/shorts/")) {
+        vidId = url.split("youtube.com/shorts/")[1].split(/[?&]/)[0];
+      } else if(url.includes("youtube.com/watch?v=")) {
+        vidId = url.split("v=")[1].split(/[?&]/)[0];
+      } else if(url.includes("youtu.be/")) {
+        vidId = url.split("youtu.be/")[1].split(/[?&]/)[0];
+      }
+      if(vidId) return `https://www.youtube.com/embed/${vidId}`;
+      return url;
+    } catch {
+      return url;
+    }
   }
 </script>
 
