@@ -1,107 +1,168 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
-<title>Imitation Game</title>
-<style>
-  body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-  video { width: 100%; max-height: 300px; background: black; }
-  button { margin: 10px 5px 20px; padding: 10px 20px; font-size: 16px; }
-  #score { font-size: 24px; margin-top: 20px; }
-  audio { width: 100%; margin-top: 10px; }
-</style>
+  <meta charset="UTF-8" />
+  <title>Imitation Game - Salle d’attente</title>
+  <style>
+    /* Style global */
+    body, html {
+      margin: 0; padding: 0; height: 100%;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: url('background.jpg') no-repeat center center fixed;
+      background-size: cover;
+      color: white;
+      display: flex; justify-content: center; align-items: center;
+      flex-direction: column;
+    }
+    #login, #lobby {
+      background: rgba(0,0,0,0.7);
+      padding: 20px;
+      border-radius: 10px;
+      width: 300px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+    }
+    #login.active, #lobby.active {
+      display: flex;
+    }
+    input[type=text] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+      border: none;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #2a9d8f;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      color: white;
+      margin-top: 10px;
+    }
+    button:disabled {
+      background-color: #555;
+      cursor: default;
+    }
+    h2 {
+      margin-bottom: 15px;
+    }
+    ul#playersList {
+      list-style: none;
+      padding: 0;
+      width: 100%;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    ul#playersList li {
+      background: rgba(42, 157, 143, 0.3);
+      margin: 5px 0;
+      padding: 8px 10px;
+      border-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .admin-badge {
+      background: gold;
+      color: black;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-left: 10px;
+    }
+  </style>
 </head>
 <body>
+  <div id="login" class="active">
+    <h2>Bienvenue, entre ton pseudo</h2>
+    <input type="text" id="pseudoInput" placeholder="Ton pseudo" maxlength="15" />
+    <button id="joinBtn">Rejoindre la partie</button>
+    <p id="loginError" style="color: #f33;"></p>
+  </div>
 
-<h1>Imitation Game</h1>
+  <div id="lobby">
+    <h2>Salle d'attente</h2>
+    <ul id="playersList"></ul>
+    <button id="startGameBtn" style="display:none;">Démarrer la partie</button>
+    <p id="lobbyInfo"></p>
+  </div>
 
-<video id="videoToImitate" controls>
-  <source src="https://sample-videos.com/video123/mp4/480/asdasdas.mp4" type="video/mp4" />
-  Ton navigateur ne supporte pas la vidéo.
-</video>
+  <script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
+  <script>
+    const socket = io('https://imitation-game-server-uz6b.onrender.com'); // Remplace par ton backend Render
 
-<div>
-  <button id="startBtn">Démarrer l'enregistrement</button>
-  <button id="stopBtn" disabled>Arrêter</button>
-</div>
+    const loginDiv = document.getElementById('login');
+    const lobbyDiv = document.getElementById('lobby');
+    const joinBtn = document.getElementById('joinBtn');
+    const pseudoInput = document.getElementById('pseudoInput');
+    const loginError = document.getElementById('loginError');
+    const playersList = document.getElementById('playersList');
+    const startGameBtn = document.getElementById('startGameBtn');
+    const lobbyInfo = document.getElementById('lobbyInfo');
 
-<p id="status">Statut : prêt</p>
+    let isAdmin = false;
 
-<audio id="audioPlayback" controls></audio>
+    joinBtn.onclick = () => {
+      const pseudo = pseudoInput.value.trim();
+      if (!pseudo) {
+        loginError.textContent = "Merci d'entrer un pseudo.";
+        return;
+      }
+      loginError.textContent = "";
+      socket.emit('joinGame', pseudo, (response) => {
+        if (response.success) {
+          isAdmin = response.isAdmin;
+          loginDiv.classList.remove('active');
+          lobbyDiv.classList.add('active');
+          updateStartBtn();
+          lobbyInfo.textContent = "En attente des joueurs...";
+        } else {
+          loginError.textContent = response.message;
+        }
+      });
+    };
 
-<div id="score"></div>
+    socket.on('playersUpdate', (players) => {
+      playersList.innerHTML = "";
+      players.forEach(player => {
+        const li = document.createElement('li');
+        li.textContent = player.pseudo + " (Points: " + (player.score || 0) + ")";
+        if (player.isAdmin) {
+          const badge = document.createElement('span');
+          badge.textContent = "ADMIN";
+          badge.classList.add('admin-badge');
+          li.appendChild(badge);
+        }
+        playersList.appendChild(li);
+      });
+      updateStartBtn();
+    });
 
-<script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
-<script>
-  const backendURL = 'https://imitation-game-server.onrender.com'; // Change avec ton URL Render
-  const socket = io(backendURL);
+    startGameBtn.onclick = () => {
+      socket.emit('startGame');
+      lobbyInfo.textContent = "La partie démarre...";
+      startGameBtn.disabled = true;
+    };
 
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const status = document.getElementById('status');
-  const audioPlayback = document.getElementById('audioPlayback');
-  const scoreDiv = document.getElementById('score');
-  const video = document.getElementById('videoToImitate');
+    socket.on('gameStarted', () => {
+      lobbyInfo.textContent = "La partie a commencé !";
+      // Ici tu peux rediriger vers la page du jeu par exemple
+    });
 
-  let mediaRecorder;
-  let audioChunks = [];
-
-  startBtn.onclick = async () => {
-    if (!navigator.mediaDevices) {
-      alert('Votre navigateur ne supporte pas la capture audio.');
-      return;
+    function updateStartBtn() {
+      if (isAdmin) {
+        startGameBtn.style.display = 'block';
+        startGameBtn.disabled = false;
+      } else {
+        startGameBtn.style.display = 'none';
+      }
     }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      mediaRecorder.start();
-      status.textContent = 'Enregistrement en cours...';
-      audioChunks = [];
-
-      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-      mediaRecorder.onstop = e => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        audioPlayback.src = audioUrl;
-
-        // Envoie l'audio au backend
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64data = reader.result.split(',')[1];
-          socket.emit('audioData', { audio: base64data });
-          status.textContent = 'Audio envoyé, en attente du score...';
-        };
-        reader.readAsDataURL(audioBlob);
-      };
-
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-    } catch (err) {
-      alert('Erreur lors de la capture audio: ' + err.message);
-    }
-  };
-
-  stopBtn.onclick = () => {
-    mediaRecorder.stop();
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-  };
-
-  // Réception du score du backend
-  socket.on('scoreResult', data => {
-    scoreDiv.textContent = `Résultat : ${data.score}`;
-    status.textContent = 'Prêt pour un nouveau tour.';
-  });
-
-  socket.on('connect', () => {
-    status.textContent = 'Connecté au serveur.';
-  });
-
-  socket.on('disconnect', () => {
-    status.textContent = 'Déconnecté du serveur.';
-  });
-</script>
-
+  </script>
 </body>
 </html>
