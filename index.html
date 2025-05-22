@@ -77,6 +77,13 @@
   .voteButtons button {
     margin: 10px 5px 0 5px;
   }
+  #nextPlayerBtn {
+    margin-top: 15px;
+    padding: 10px 25px;
+    font-size: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -112,6 +119,7 @@
       <button id="votePlus">+1</button>
       <button id="voteMinus">-1</button>
     </div>
+    <button id="nextPlayerBtn" style="display:none;">Joueur suivant</button>
   </div>
 </div>
 
@@ -130,6 +138,9 @@
   let mediaRecorder;
   let audioChunks = [];
 
+  let listenOrder = [];
+  let listenIndex = 0;
+
   // Elements DOM
   const playerList = document.getElementById("playerList");
   const lobbyPlayerList = document.getElementById("lobbyPlayerList");
@@ -146,6 +157,7 @@
   const voteTop = document.getElementById("voteTop");
   const votePlus = document.getElementById("votePlus");
   const voteMinus = document.getElementById("voteMinus");
+  const nextPlayerBtn = document.getElementById("nextPlayerBtn");
 
   socket.emit("joinGame", pseudo, (res) => {
     if (!res.success) {
@@ -186,6 +198,7 @@
     gameDiv.style.display = "none";
     showRecordingControls(true);
     showVoteButtons(false);
+    nextPlayerBtn.style.display = "none";
   }
 
   function showGame() {
@@ -193,6 +206,7 @@
     gameDiv.style.display = "flex";
     showRecordingControls(true);
     showVoteButtons(false);
+    nextPlayerBtn.style.display = "none";
   }
 
   // Contrôles d'enregistrement
@@ -343,6 +357,7 @@
 
     showRecordingControls(true);
     showVoteButtons(false);
+    nextPlayerBtn.style.display = "none";
 
     recordedAudio.src = "";
     recordedAudio.style.display = "none";
@@ -350,21 +365,48 @@
 
   // Gérer le passage à la phase écoute
 
-  socket.on("startListeningPhase", ({ round }) => {
+  socket.on("startListeningPhase", ({ round, listenOrder }) => {
     alert(`Phase d'écoute du round ${round} commencée !`);
+    listenOrder = listenOrder;
+    listenIndex = 0;
     showListeningPhase(round);
   });
+
+  let listenIndex = 0;
 
   function showListeningPhase(round) {
     lobbyDiv.style.display = "none";
     gameDiv.style.display = "flex";
 
-    roundInfo.textContent = `Phase d'écoute - Round ${round}`;
+    roundInfo.textContent = `Phase d'écoute Manche ${round} - Joueur : ${listenOrder[listenIndex].pseudo}`;
 
     showRecordingControls(false);
     showVoteButtons(true);
 
-    // TODO : afficher la liste des enregistrements audio des joueurs (à recevoir du backend)
+    // Vidéo en mute
+    video.muted = true;
+    video.play();
+
+    // Audio enregistré du joueur en écoute
+    recordedAudio.style.display = "block";
+    recordedAudio.src = `data:audio/webm;base64,${listenOrder[listenIndex].audio}`;
+    recordedAudio.play();
+
+    // Affichage bouton "Joueur suivant"
+    nextPlayerBtn.style.display = "inline-block";
+    nextPlayerBtn.disabled = false;
+    nextPlayerBtn.onclick = () => {
+      listenIndex++;
+      if (listenIndex >= listenOrder.length) {
+        alert("Fin de la phase d'écoute !");
+        nextPlayerBtn.disabled = true;
+        // Ici, tu peux déclencher la prochaine manche ou fin de jeu
+      } else {
+        roundInfo.textContent = `Phase d'écoute Manche ${round} - Joueur : ${listenOrder[listenIndex].pseudo}`;
+        recordedAudio.src = `data:audio/webm;base64,${listenOrder[listenIndex].audio}`;
+        recordedAudio.play();
+      }
+    };
   }
 </script>
 </body>
