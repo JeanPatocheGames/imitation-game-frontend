@@ -278,23 +278,8 @@
   const joinBtn = document.getElementById("joinBtn");
   const voteButtonsDiv = document.querySelector('.voteButtons');
 
-  // Convertit url youtube shorts ou normales vers embed youtube
-  function convertToEmbedUrl(url) {
-    try {
-      let vidId = null;
-      if (url.includes("youtube.com/shorts/")) {
-        vidId = url.split("youtube.com/shorts/")[1].split(/[?&]/)[0];
-      } else if (url.includes("youtube.com/watch?v=")) {
-        vidId = url.split("v=")[1].split(/[?&]/)[0];
-      } else if (url.includes("youtu.be/")) {
-        vidId = url.split("youtu.be/")[1].split(/[?&]/)[0];
-      }
-      if (vidId) return `https://www.youtube.com/embed/${vidId}`;
-      return url;
-    } catch {
-      return url;
-    }
-  }
+  // Socket initialisé après login
+  let socket = null;
 
   joinBtn.onclick = () => {
     const val = pseudoInput.value.trim();
@@ -313,15 +298,24 @@
       if (!res.success) {
         alert("Erreur : " + res.message);
         location.reload();
-      } else {
-        alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
-        if (res.isAdmin) {
-          startGameBtn.style.display = "inline-block";
-        }
+        return;
+      }
+      alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
+      if (res.isAdmin) {
+        startGameBtn.style.display = "inline-block";
       }
     });
 
     setupSocketEvents();
+
+    // Branche bouton start game ici, après socket initialisé
+    startGameBtn.onclick = () => {
+      if (socket) {
+        socket.emit("startGame");
+      } else {
+        alert("Socket non initialisé, veuillez vous reconnecter.");
+      }
+    };
   };
 
   function setupSocketEvents() {
@@ -355,11 +349,9 @@
       ytVideo.src = "";
 
       if(data.phase === "imitation") {
-        // Affiche vidéo youtube muette à imiter
         ytVideo.src = convertToEmbedUrl(data.videoURL) + "?autoplay=1&mute=1&enablejsapi=1";
         showRecordingControls(true);
       } else {
-        // Phase écoute (sera gérée via autre event)
         showRecordingControls(false);
       }
     });
@@ -375,19 +367,13 @@
       showGame(true);
       roundInfo.textContent = `Phase d'écoute - Round ${round} Manche ${manche} - Écoute de ${listenOrder[listenIndex].pseudo}`;
 
-      // Affiche vidéo youtube muette
       ytVideo.src = convertToEmbedUrl(listenOrder[listenIndex].videoURL) + "?autoplay=1&mute=1&enablejsapi=1";
 
-      // Joue l’audio du participant
       playerAudio.src = listenOrder[listenIndex].audio;
       playerAudio.style.display = "block";
       playerAudio.play();
 
       resetVoteButtons();
-
-      voteTop.disabled = (usedTopVotes >= 1);
-      votePlus.disabled = false;
-      voteMinus.disabled = false;
 
       voteTop.onclick = () => vote("TOP");
       votePlus.onclick = () => vote("+1");
@@ -470,6 +456,23 @@
     validateRec.style.display = show ? "inline-block" : "none";
   }
 
+  function convertToEmbedUrl(url) {
+    try {
+      let vidId = null;
+      if(url.includes("youtube.com/shorts/")) {
+        vidId = url.split("youtube.com/shorts/")[1].split(/[?&]/)[0];
+      } else if(url.includes("youtube.com/watch?v=")) {
+        vidId = url.split("v=")[1].split(/[?&]/)[0];
+      } else if(url.includes("youtu.be/")) {
+        vidId = url.split("youtu.be/")[1].split(/[?&]/)[0];
+      }
+      if(vidId) return `https://www.youtube.com/embed/${vidId}`;
+      return url;
+    } catch {
+      return url;
+    }
+  }
+
   // Enregistrement audio
 
   startRec.onclick = async () => {
@@ -519,7 +522,7 @@
       alert("Vous devez enregistrer quelque chose d'abord !");
       return;
     }
-    if (listenOrder[listenIndex] && listenOrder[listenIndex].pseudo === pseudo) {
+    if (listenOrder[listenIndex]?.pseudo === pseudo) {
       showToast("Vous ne pouvez pas voter pour vous-même !");
       return;
     }
@@ -572,7 +575,8 @@
   function vote(type) {
     if(hasVoted) return;
 
-    if (listenOrder[listenIndex].pseudo === pseudo) {
+    // Empêche de voter pour soi-même
+    if (listenOrder[listenIndex]?.pseudo === pseudo) {
       showToast("Vous ne pouvez pas voter pour vous-même !");
       return;
     }
@@ -593,20 +597,6 @@
       voteType: type
     });
   }
-
-  socket && socket.on("updateListeningPhase", ({ listenIndex: idx }) => {
-    listenIndex = idx;
-    if(listenIndex >= listenOrder.length) {
-      showToast("Phase d'écoute terminée !");
-      voteButtonsDiv.style.display = "none";
-      nextPlayerBtn.style.display = "none";
-      playerAudio.style.display = "none";
-      ytVideo.src = "";
-      showLobby(true);
-      return;
-    }
-    showListeningPhase();
-  });
 
   nextPlayerBtn.onclick = () => {
     listenIndex++;
@@ -643,15 +633,6 @@
     resetRec.disabled = true;
     validateRec.disabled = true;
   }
-
-  startGameBtn.onclick = () => {
-  if (socket) {
-    socket.emit("startGame");
-  } else {
-    alert("Socket non initialisé, veuillez vous reconnecter.");
-  }
-};
-
 </script>
 
 </body>
