@@ -236,4 +236,67 @@
     };
     mediaRecorder.onstop = e => {
       resetRec.disabled = false;
-      validateRec
+      validateRec.disabled = false;
+    };
+  };
+
+  stopRec.onclick = () => {
+    if (mediaRecorder) mediaRecorder.stop();
+    startRec.disabled = false;
+    stopRec.disabled = true;
+  };
+
+  resetRec.onclick = () => {
+    audioChunks = [];
+    startRec.disabled = false;
+    stopRec.disabled = true;
+    resetRec.disabled = true;
+    validateRec.disabled = true;
+  };
+
+  validateRec.onclick = () => {
+    socket.emit("validateImitation", pseudo);
+    alert("Imitation validée !");
+    validateRec.disabled = true;
+  };
+
+  // Votes
+
+  function disableVoteButtons() {
+    voteTop.disabled = true;
+    votePlus.disabled = true;
+    voteMinus.disabled = true;
+  }
+
+  voteTop.onclick = () => {
+    if (hasVoted) return alert("Vous avez déjà voté ce round.");
+    socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "TOP" });
+    disableVoteButtons();
+    hasVoted = true;
+  };
+  votePlus.onclick = () => {
+    if (hasVoted) return alert("Vous avez déjà voté ce round.");
+    socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "+1" });
+    disableVoteButtons();
+    hasVoted = true;
+  };
+  voteMinus.onclick = () => {
+    if (hasVoted) return alert("Vous avez déjà voté ce round.");
+    socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "-1" });
+    disableVoteButtons();
+    hasVoted = true;
+  };
+
+  function resetRecordingUI() {
+    startRec.disabled = false;
+    stopRec.disabled = true;
+    resetRec.disabled = true;
+    validateRec.disabled = true;
+    hasVoted = false;
+    voteTop.disabled = false;
+    votePlus.disabled = false;
+    voteMinus.disabled = false;
+  }
+</script>
+</body>
+</html>
