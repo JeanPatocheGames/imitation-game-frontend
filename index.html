@@ -645,8 +645,13 @@
   }
 
   startGameBtn.onclick = () => {
+  if (socket) {
     socket.emit("startGame");
-  };
+  } else {
+    alert("Socket non initialisé, veuillez vous reconnecter.");
+  }
+};
+
 </script>
 
 </body>
