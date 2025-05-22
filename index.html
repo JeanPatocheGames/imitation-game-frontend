@@ -28,11 +28,13 @@
     text-align: center;
   }
   #loginScreen h1 {
-    margin-bottom: 10px;
+    margin: 0 0 12px 0;
     line-height: 1.2;
   }
   #loginScreen h1 span {
     display: block;
+    font-weight: 900;
+    font-size: 1.8em;
   }
   #loginScreen input {
     width: 100%;
@@ -58,7 +60,7 @@
 
   #gameScreen {
     display: none;
-    max-width: 1000px;
+    max-width: 1100px;
     width: 90vw;
     display: flex;
     gap: 20px;
@@ -92,14 +94,11 @@
     display: flex;
     justify-content: space-between;
     font-weight: 600;
+    align-items: center;
   }
-  #players li .checkmark {
-    color: #4caf50;
+  .admin-label {
+    color: #f0c419;
     font-weight: 900;
-    margin-left: 10px;
-  }
-  #players li.admin {
-    border: 2px solid #42a5f5;
   }
 
   #main {
@@ -142,7 +141,7 @@
     border-radius: 6px;
   }
 
-  #controls, .voteButtons, #adminControls {
+  #controls, .voteButtons {
     margin-top: 25px;
     display: flex;
     justify-content: center;
@@ -207,24 +206,73 @@
     pointer-events: auto;
   }
 
-  #timer {
+  /* Admin panel */
+  #adminPanel {
+    width: 220px;
+    background: #222;
+    border-radius: 12px;
+    padding: 20px;
+    max-height: 80vh;
+    overflow-y: auto;
+    color: #f0c419;
+    font-weight: 600;
+  }
+  #adminPanel h3 {
+    margin-top: 0;
+    font-size: 20px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #555;
+    padding-bottom: 6px;
+  }
+  #adminPanel button {
+    width: 100%;
+    margin-bottom: 12px;
+  }
+  .kick-btn {
+    background: #e14c4c;
+    padding: 6px 10px;
+    font-size: 14px;
+    border-radius: 6px;
+    margin-left: 6px;
+    flex-shrink: 0;
+  }
+  .kick-btn:hover {
+    background: #ba3e3e;
+  }
+  .player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  /* Checkmark for validated imitation */
+  .validated-mark {
+    color: #4caf50;
+    font-weight: 900;
+    margin-left: 8px;
+    font-size: 20px;
+  }
+
+  /* Timer box */
+  #voteTimer {
     position: absolute;
-    top: 15px;
-    right: 15px;
-    background: #42a5f5;
-    padding: 10px 15px;
+    top: 10px;
+    right: 10px;
+    background: #222;
+    color: #f0c419;
+    font-weight: 900;
+    padding: 6px 12px;
     border-radius: 8px;
-    font-weight: 700;
     font-size: 18px;
     user-select: none;
   }
-
 </style>
 </head>
 <body>
 
 <div id="loginScreen">
-  <h1><span>Bienvenue au</span><span>Darons Imitation Game</span></h1>
+  <h1>Bienvenue au <span>Darons Imitation Game</span></h1>
   <input type="text" id="pseudoInput" placeholder="Entrez votre pseudo" autocomplete="off" />
   <button id="joinBtn">Rejoindre la partie</button>
 </div>
@@ -234,26 +282,21 @@
     <h2>Classement</h2>
     <ul id="playerList"></ul>
   </div>
+
   <div id="main">
     <div id="lobby">
       <h1>Salle d'attente</h1>
       <p>Liste des joueurs :</p>
       <ul id="lobbyPlayerList"></ul>
       <button id="startGameBtn" style="display:none;">Démarrer la partie</button>
-      <div id="adminControls" style="display:none;">
-        <button id="restartGameBtn" title="Redémarrer la partie">Restart Game</button>
-        <button id="skipMancheBtn" title="Passer à la manche suivante">Skip Manche</button>
-        <select id="kickSelect" title="Sélectionner un joueur à kicker"></select>
-        <button id="kickBtn" title="Kick joueur sélectionné">Kick</button>
-      </div>
     </div>
 
     <div id="game" style="display:none; flex-direction: column; align-items: center; width: 100%; position: relative;">
-      <div id="timer" style="display:none;">20</div>
       <div id="roundInfo"></div>
       
       <div id="videoContainer">
         <iframe id="ytVideo" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        <div id="voteTimer" style="display:none;">20</div>
       </div>
 
       <audio id="playerAudio" controls style="display:none;"></audio>
@@ -263,6 +306,7 @@
         <button id="stopRec" disabled>Arrêter</button>
         <button id="resetRec" disabled>Recommencer</button>
         <button id="validateRec" disabled>C'est parfait</button>
+        <span id="validatedMark" class="validated-mark" style="display:none;">✓</span>
       </div>
 
       <div class="voteButtons" style="display:none;">
@@ -273,6 +317,14 @@
 
       <button id="nextPlayerBtn" style="display:none; margin-top: 20px;">Joueur suivant</button>
     </div>
+  </div>
+
+  <div id="adminPanel" style="display:none;">
+    <h3>Outils Admin</h3>
+    <button id="restartGameBtn">Restart Game</button>
+    <button id="skipMancheBtn">Skip Manche</button>
+    <h4>Joueurs connectés</h4>
+    <ul id="adminPlayerList"></ul>
   </div>
 </div>
 
@@ -288,18 +340,15 @@
   let listenOrder = [];
   let listenIndex = 0;
   let usedTopVotes = 0;
-  let timerInterval = null;
-  let timerCount = 20;
+
+  let voteTimerInterval = null;
+  let voteTimeLeft = 20;
 
   const loginScreen = document.getElementById("loginScreen");
   const gameScreen = document.getElementById("gameScreen");
   const playerList = document.getElementById("playerList");
   const lobbyPlayerList = document.getElementById("lobbyPlayerList");
   const startGameBtn = document.getElementById("startGameBtn");
-  const restartGameBtn = document.getElementById("restartGameBtn");
-  const skipMancheBtn = document.getElementById("skipMancheBtn");
-  const kickSelect = document.getElementById("kickSelect");
-  const kickBtn = document.getElementById("kickBtn");
   const lobbyDiv = document.getElementById("lobby");
   const gameDiv = document.getElementById("game");
   const roundInfo = document.getElementById("roundInfo");
@@ -309,15 +358,19 @@
   const stopRec = document.getElementById("stopRec");
   const resetRec = document.getElementById("resetRec");
   const validateRec = document.getElementById("validateRec");
+  const validatedMark = document.getElementById("validatedMark");
   const voteTop = document.getElementById("voteTop");
   const votePlus = document.getElementById("votePlus");
   const voteMinus = document.getElementById("voteMinus");
   const nextPlayerBtn = document.getElementById("nextPlayerBtn");
-  const voteButtonsDiv = document.querySelector('.voteButtons');
-  const timerDiv = document.getElementById("timer");
+  const voteButtonsDiv = document.querySelector(".voteButtons");
+  const voteTimer = document.getElementById("voteTimer");
+  const adminPanel = document.getElementById("adminPanel");
+  const restartGameBtn = document.getElementById("restartGameBtn");
+  const skipMancheBtn = document.getElementById("skipMancheBtn");
+  const adminPlayerList = document.getElementById("adminPlayerList");
   const pseudoInput = document.getElementById("pseudoInput");
   const joinBtn = document.getElementById("joinBtn");
-  const adminControls = document.getElementById("adminControls");
 
   let socket;
 
@@ -341,9 +394,8 @@
       } else {
         alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
         if (res.isAdmin) {
+          adminPanel.style.display = "block";
           startGameBtn.style.display = "inline-block";
-          adminControls.style.display = "flex";
-          refreshKickList([]);
         }
       }
     });
@@ -355,7 +407,6 @@
     socket.on("playersUpdate", updatePlayerList);
     socket.on("lobbyUpdate", ({ players, gameStarted: started }) => {
       updateLobbyPlayers(players);
-      refreshKickList(players);
       if (started) {
         gameStarted = true;
         showGame();
@@ -368,12 +419,12 @@
       gameStarted = true;
       showGame();
     });
-
     socket.on("roundUpdate", data => {
       listenOrder = [];
       listenIndex = 0;
       usedTopVotes = 0;
       hasVoted = false;
+      resetVoteTimer();
 
       roundInfo.textContent = `Round ${data.currentRound} / ${data.totalRounds} - Manche ${data.currentManche} / ${data.totalManches}`;
       voteButtonsDiv.style.display = "none";
@@ -381,9 +432,9 @@
       playerAudio.style.display = "none";
       playerAudio.src = "";
       ytVideo.src = "";
-      timerDiv.style.display = "none";
+      validatedMark.style.display = "none";
 
-      if(data.phase === "imitation") {
+      if (data.phase === "imitation") {
         ytVideo.src = convertToEmbedUrl(data.videoURL) + "?autoplay=1&mute=1&enablejsapi=1";
         showRecordingControls(true);
       } else {
@@ -403,61 +454,45 @@
       roundInfo.textContent = `Phase d'écoute - Round ${round} Manche ${manche} - Écoute de ${listenOrder[listenIndex].pseudo}`;
 
       ytVideo.src = convertToEmbedUrl(listenOrder[listenIndex].videoURL) + "?autoplay=1&mute=1&enablejsapi=1";
+
       playerAudio.src = listenOrder[listenIndex].audio;
       playerAudio.style.display = "block";
       playerAudio.play();
 
       resetVoteButtons();
+      updateVoteTimer();
 
       voteTop.disabled = (usedTopVotes >= 1);
       votePlus.disabled = false;
       voteMinus.disabled = false;
-
-      hasVoted = false;
 
       voteTop.onclick = () => vote("TOP");
       votePlus.onclick = () => vote("+1");
       voteMinus.onclick = () => vote("-1");
 
       if(listenOrder[listenIndex].pseudo === pseudo) {
-        // Le joueur écoute sa propre imitation, il ne vote pas et pas de timer
-        timerDiv.style.display = "none";
-        voteButtonsDiv.style.display = "none";
-        nextPlayerBtn.style.display = "inline-block";
+        // Le joueur qui écoute sa propre imitation ne peut pas voter, timer caché
+        disableVoteButtons(true);
+        voteTimer.style.display = "none";
       } else {
-        // Timer pour les votes
-        timerCount = 20;
-        timerDiv.style.display = "block";
-        nextPlayerBtn.style.display = "none";
-        startTimer();
+        disableVoteButtons(false);
+        voteTimer.style.display = "block";
       }
 
-      nextPlayerBtn.onclick = () => {
-        listenIndex++;
-        if(listenIndex >= listenOrder.length) {
-          showToast("Phase d'écoute terminée !");
-          voteButtonsDiv.style.display = "none";
-          nextPlayerBtn.style.display = "none";
-          playerAudio.style.display = "none";
-          ytVideo.src = "";
-          showLobby(true);
-          stopTimer();
-          return;
-        }
-        showListeningPhase();
-      };
+      nextPlayerBtn.style.display = "none";
+      nextPlayerBtn.onclick = null;
     });
 
     socket.on("updateListeningPhase", ({ listenIndex: idx }) => {
       listenIndex = idx;
-      if(listenIndex >= listenOrder.length) {
+      if (listenIndex >= listenOrder.length) {
         showToast("Phase d'écoute terminée !");
         voteButtonsDiv.style.display = "none";
         nextPlayerBtn.style.display = "none";
         playerAudio.style.display = "none";
         ytVideo.src = "";
         showLobby(true);
-        stopTimer();
+        resetVoteTimer();
         return;
       }
       showListeningPhase();
@@ -470,25 +505,40 @@
     });
 
     socket.on("kicked", () => {
-      alert("Vous avez été expulsé de la partie !");
+      alert("Vous avez été expulsé par l'admin.");
       location.reload();
     });
   }
 
   function updatePlayerList(players) {
     playerList.innerHTML = "";
+    adminPlayerList.innerHTML = "";
     players.forEach(p => {
       const li = document.createElement("li");
       li.textContent = `${p.pseudo} (${p.score} pts)`;
-      if(p.isAdmin) li.textContent += " [ADMIN]";
-      if(p.hasValidated) {
-        const check = document.createElement("span");
-        check.textContent = "✓";
-        check.className = "checkmark";
-        li.appendChild(check);
-      }
-      if(p.isAdmin) li.classList.add("admin");
+      if (p.isAdmin) li.textContent += " [ADMIN]";
       playerList.appendChild(li);
+
+      // Admin panel player list with kick buttons
+      const adminLi = document.createElement("li");
+      adminLi.classList.add("player-item");
+      const span = document.createElement("span");
+      span.textContent = p.pseudo;
+      if (p.isAdmin) span.classList.add("admin-label");
+      adminLi.appendChild(span);
+
+      if (!p.isAdmin) {
+        const kickBtn = document.createElement("button");
+        kickBtn.classList.add("kick-btn");
+        kickBtn.textContent = "Kick";
+        kickBtn.onclick = () => {
+          if(confirm(`Expulser ${p.pseudo} ?`)) {
+            socket.emit("kickPlayer", p.pseudo);
+          }
+        };
+        adminLi.appendChild(kickBtn);
+      }
+      adminPlayerList.appendChild(adminLi);
     });
   }
 
@@ -498,19 +548,6 @@
       const li = document.createElement("li");
       li.textContent = p;
       lobbyPlayerList.appendChild(li);
-    });
-  }
-
-  function refreshKickList(players) {
-    // Liste déroulante des joueurs pour kicker, sauf admin et soi-même
-    kickSelect.innerHTML = "";
-    players.forEach(p => {
-      if(p !== pseudo) {
-        const option = document.createElement("option");
-        option.value = p;
-        option.textContent = p;
-        kickSelect.appendChild(option);
-      }
     });
   }
 
@@ -533,44 +570,21 @@
     stopRec.style.display = show ? "inline-block" : "none";
     resetRec.style.display = show ? "inline-block" : "none";
     validateRec.style.display = show ? "inline-block" : "none";
-  }
-
-  function startTimer() {
-    timerDiv.textContent = timerCount;
-    if(timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
-      timerCount--;
-      timerDiv.textContent = timerCount;
-      if(timerCount <= 0) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-        timerDiv.style.display = "none";
-        nextPlayerBtn.style.display = "inline-block";
-        voteButtonsDiv.style.display = "none";
-      }
-    }, 1000);
-  }
-
-  function stopTimer() {
-    if(timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-      timerDiv.style.display = "none";
-    }
+    validatedMark.style.display = "none";
   }
 
   // Convertit url youtube shorts ou normales vers embed youtube
   function convertToEmbedUrl(url) {
     try {
       let vidId = null;
-      if(url.includes("youtube.com/shorts/")) {
+      if (url.includes("youtube.com/shorts/")) {
         vidId = url.split("youtube.com/shorts/")[1].split(/[?&]/)[0];
-      } else if(url.includes("youtube.com/watch?v=")) {
+      } else if (url.includes("youtube.com/watch?v=")) {
         vidId = url.split("v=")[1].split(/[?&]/)[0];
-      } else if(url.includes("youtu.be/")) {
+      } else if (url.includes("youtu.be/")) {
         vidId = url.split("youtu.be/")[1].split(/[?&]/)[0];
       }
-      if(vidId) return `https://www.youtube.com/embed/${vidId}`;
+      if (vidId) return `https://www.youtube.com/embed/${vidId}`;
       return url;
     } catch {
       return url;
@@ -578,9 +592,8 @@
   }
 
   // Enregistrement audio
-
   startRec.onclick = async () => {
-    if(!navigator.mediaDevices) {
+    if (!navigator.mediaDevices) {
       alert("Votre navigateur ne supporte pas la capture audio.");
       return;
     }
@@ -592,6 +605,7 @@
     stopRec.disabled = false;
     resetRec.disabled = true;
     validateRec.disabled = true;
+    validatedMark.style.display = "none";
 
     mediaRecorder.ondataavailable = e => {
       audioChunks.push(e.data);
@@ -619,10 +633,11 @@
     playerAudio.style.display = "none";
     resetRec.disabled = true;
     validateRec.disabled = true;
+    validatedMark.style.display = "none";
   };
 
   validateRec.onclick = () => {
-    if(!playerAudio.src) {
+    if (!playerAudio.src) {
       alert("Vous devez enregistrer quelque chose d'abord !");
       return;
     }
@@ -632,6 +647,7 @@
       socket.emit("validateImitation", { pseudo, audio: base64Audio });
       showToast("Imitation validée, en attente des autres joueurs...");
       disableRecordButtons(true);
+      validatedMark.style.display = "inline-block";
     };
     fetch(playerAudio.src)
       .then(res => res.blob())
@@ -646,7 +662,6 @@
   }
 
   // Phase écoute + votes
-
   function showListeningPhase() {
     const currentPlayer = listenOrder[listenIndex];
     roundInfo.textContent = `Phase d'écoute - Écoute de ${currentPlayer.pseudo}`;
@@ -657,6 +672,7 @@
     playerAudio.play();
 
     resetVoteButtons();
+    updateVoteTimer();
 
     voteTop.disabled = (usedTopVotes >= 1);
     votePlus.disabled = false;
@@ -668,21 +684,30 @@
     votePlus.onclick = () => vote("+1");
     voteMinus.onclick = () => vote("-1");
 
+    if (currentPlayer.pseudo === pseudo) {
+      // Le joueur qui écoute sa propre imitation ne peut pas voter, timer caché
+      disableVoteButtons(true);
+      voteTimer.style.display = "none";
+    } else {
+      disableVoteButtons(false);
+      voteTimer.style.display = "block";
+    }
+
     nextPlayerBtn.style.display = "none";
     nextPlayerBtn.onclick = null;
   }
 
   function vote(type) {
-    if(hasVoted) return;
+    if (hasVoted) return;
 
-    if(listenOrder[listenIndex].pseudo === pseudo) {
+    if (listenOrder[listenIndex].pseudo === pseudo) {
       showToast("Vous ne pouvez pas voter pour vous-même !");
       return;
     }
 
     hasVoted = true;
 
-    if(type === "TOP") usedTopVotes++;
+    if (type === "TOP") usedTopVotes++;
 
     voteTop.disabled = (usedTopVotes >= 1);
     votePlus.disabled = true;
@@ -697,16 +722,31 @@
     });
   }
 
-  nextPlayerBtn.onclick = () => {
-    listenIndex++;
-    if(listenIndex >= listenOrder.length) {
+  socket && socket.on("updateListeningPhase", ({ listenIndex: idx }) => {
+    listenIndex = idx;
+    if (listenIndex >= listenOrder.length) {
       showToast("Phase d'écoute terminée !");
       voteButtonsDiv.style.display = "none";
       nextPlayerBtn.style.display = "none";
       playerAudio.style.display = "none";
       ytVideo.src = "";
       showLobby(true);
-      stopTimer();
+      resetVoteTimer();
+      return;
+    }
+    showListeningPhase();
+  });
+
+  nextPlayerBtn.onclick = () => {
+    listenIndex++;
+    if (listenIndex >= listenOrder.length) {
+      showToast("Phase d'écoute terminée !");
+      voteButtonsDiv.style.display = "none";
+      nextPlayerBtn.style.display = "none";
+      playerAudio.style.display = "none";
+      ytVideo.src = "";
+      showLobby(true);
+      resetVoteTimer();
       return;
     }
     showListeningPhase();
@@ -718,6 +758,34 @@
     voteMinus.disabled = false;
   }
 
+  function disableVoteButtons(disabled) {
+    voteTop.disabled = disabled;
+    votePlus.disabled = disabled;
+    voteMinus.disabled = disabled;
+  }
+
+  // Timer votes
+  function updateVoteTimer() {
+    voteTimeLeft = 20;
+    voteTimer.textContent = voteTimeLeft;
+    voteTimer.style.display = "block";
+
+    if (voteTimerInterval) clearInterval(voteTimerInterval);
+
+    voteTimerInterval = setInterval(() => {
+      voteTimeLeft--;
+      voteTimer.textContent = voteTimeLeft;
+      if (voteTimeLeft <= 0) {
+        clearInterval(voteTimerInterval);
+      }
+    }, 1000);
+  }
+
+  function resetVoteTimer() {
+    if (voteTimerInterval) clearInterval(voteTimerInterval);
+    voteTimer.style.display = "none";
+  }
+
   // Toast notification
   function showToast(msg) {
     const toast = document.getElementById("toast");
@@ -726,31 +794,15 @@
     setTimeout(() => toast.classList.remove("show"), 2500);
   }
 
-  function resetRecordingUI() {
-    disableRecordButtons(false);
-    playerAudio.src = "";
-    playerAudio.style.display = "none";
-    resetRec.disabled = true;
-    validateRec.disabled = true;
-  }
-
-  startGameBtn.onclick = () => {
-    if(socket) socket.emit("startGame");
-    else alert("Socket non initialisé, veuillez vous reconnecter.");
-  };
-
+  // Admin buttons
   restartGameBtn.onclick = () => {
-    if(socket) socket.emit("restartGame");
+    if(confirm("Voulez-vous vraiment redémarrer la partie ?")) {
+      socket.emit("restartGame");
+    }
   };
-
   skipMancheBtn.onclick = () => {
-    if(socket) socket.emit("skipManche");
-  };
-
-  kickBtn.onclick = () => {
-    if(socket) {
-      const playerToKick = kickSelect.value;
-      if(playerToKick) socket.emit("kickPlayer", playerToKick);
+    if(confirm("Voulez-vous vraiment passer à la manche suivante ?")) {
+      socket.emit("skipManche");
     }
   };
 
