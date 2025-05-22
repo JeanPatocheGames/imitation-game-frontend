@@ -2,31 +2,73 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<title>Imitation Game</title>
+<title>Imitation Game - Animations et Vote</title>
 <style>
   body {
     font-family: Arial, sans-serif;
     margin: 0; padding: 0;
-    background: #222;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
     color: white;
-    display: flex; height: 100vh;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #loginScreen, #gameScreen {
+    background: rgba(0,0,0,0.7);
+    border-radius: 10px;
+    padding: 30px 40px;
+    width: 320px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    text-align: center;
+  }
+  #loginScreen input {
+    width: 100%;
+    padding: 12px 10px;
+    margin: 15px 0 20px 0;
+    font-size: 16px;
+    border-radius: 6px;
+    border: none;
+  }
+  #loginScreen button {
+    background: #00b894;
+    border: none;
+    padding: 12px 25px;
+    font-size: 18px;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  #loginScreen button:hover {
+    background: #019971;
+  }
+  #gameScreen {
+    display: none;
+    flex-direction: row;
+    height: 90vh;
+    max-width: 1200px;
+    width: 100%;
   }
   #players {
     width: 250px;
     background: #333;
-    padding: 10px;
+    padding: 15px;
     overflow-y: auto;
+    border-radius: 10px 0 0 10px;
   }
   #players h2 {
     margin-top: 0;
+    font-size: 24px;
   }
   #players ul {
     list-style: none;
     padding: 0;
+    margin: 0;
   }
   #players li {
-    margin: 5px 0;
-    padding: 5px;
+    margin: 8px 0;
+    padding: 8px 10px;
     background: #444;
     border-radius: 5px;
     display: flex;
@@ -34,105 +76,145 @@
   }
   #main {
     flex: 1;
-    padding: 20px;
+    background: #222;
+    padding: 30px;
+    border-radius: 0 10px 10px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
   }
-  #lobby {
-    text-align: center;
-  }
-  #game {
-    display: none;
-    flex-direction: column;
-    align-items: center;
+  #roundInfo {
+    font-size: 28px;
+    margin-bottom: 15px;
+    font-weight: bold;
   }
   video {
     max-width: 100%;
     max-height: 50vh;
+    border-radius: 10px;
     background: black;
-    margin-bottom: 10px;
   }
-  #recordedAudio {
-    margin-bottom: 10px;
-    max-width: 100%;
+  audio {
+    margin-top: 15px;
+    width: 100%;
+    outline: none;
+    border-radius: 6px;
   }
-  #roundInfo {
-    font-size: 24px;
-    margin-bottom: 10px;
+  #controls, .voteButtons {
+    margin-top: 20px;
   }
-  #controls button {
-    margin: 5px;
-    padding: 10px 20px;
-    font-size: 16px;
+  #controls button, .voteButtons button, #nextPlayerBtn {
+    background: #0984e3;
     border: none;
-    border-radius: 5px;
+    color: white;
+    padding: 12px 22px;
+    font-size: 16px;
+    border-radius: 6px;
     cursor: pointer;
+    margin: 0 6px 10px 6px;
+    transition: background 0.3s ease;
   }
-  #controls button:disabled {
+  #controls button:disabled, .voteButtons button:disabled, #nextPlayerBtn:disabled {
     background: #555;
-    cursor: default;
+    cursor: not-allowed;
   }
-  .voteButtons button {
-    margin: 10px 5px 0 5px;
+  #controls button:hover:not(:disabled), .voteButtons button:hover:not(:disabled), #nextPlayerBtn:hover:not(:disabled) {
+    background: #74b9ff;
   }
   #nextPlayerBtn {
-    margin-top: 15px;
-    padding: 10px 25px;
+    margin-top: 30px;
+  }
+
+  /* Animation de glow au clic sur bouton vote */
+  @keyframes voteGlow {
+    0% {
+      box-shadow: 0 0 0px rgba(255, 255, 255, 0);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 12px 4px rgba(255, 255, 0, 0.8);
+      transform: scale(1.1);
+    }
+    100% {
+      box-shadow: 0 0 0px rgba(255, 255, 255, 0);
+      transform: scale(1);
+    }
+  }
+  .vote-anim {
+    animation: voteGlow 0.5s ease forwards;
+  }
+
+  /* Toast notification style */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: #222;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.7);
     font-size: 16px;
-    border-radius: 5px;
-    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    z-index: 9999;
+  }
+  #toast.show {
+    opacity: 1;
+    pointer-events: auto;
   }
 </style>
 </head>
 <body>
 
-<div id="players">
-  <h2>Classement</h2>
-  <ul id="playerList"></ul>
+<div id="loginScreen">
+  <h1>Bienvenue au Imitation Game</h1>
+  <input type="text" id="pseudoInput" placeholder="Entrez votre pseudo" autocomplete="off" />
+  <button id="joinBtn">Rejoindre la partie</button>
 </div>
 
-<div id="main">
-  <div id="lobby">
-    <h1>Salle d'attente</h1>
-    <p>Liste des joueurs :</p>
-    <ul id="lobbyPlayerList"></ul>
-    <button id="startGameBtn" style="display:none;">Démarrer la partie</button>
+<div id="gameScreen">
+  <div id="players">
+    <h2>Classement</h2>
+    <ul id="playerList"></ul>
   </div>
+  <div id="main">
+    <div id="lobby">
+      <h1>Salle d'attente</h1>
+      <p>Liste des joueurs :</p>
+      <ul id="lobbyPlayerList"></ul>
+      <button id="startGameBtn" style="display:none;">Démarrer la partie</button>
+    </div>
 
-  <div id="game">
-    <div id="roundInfo"></div>
-    <video id="video" controls muted>
-      <source src="" type="video/mp4" />
-      Ton navigateur ne supporte pas la vidéo.
-    </video>
-    <audio id="recordedAudio" controls style="display:none;"></audio>
-    <div id="controls">
-      <button id="startRec">Démarrer l'enregistrement</button>
-      <button id="stopRec" disabled>Arrêter</button>
-      <button id="resetRec" disabled>Recommencer</button>
-      <button id="validateRec" disabled>C'est parfait</button>
+    <div id="game" style="display:none; flex-direction: column; align-items: center;">
+      <div id="roundInfo"></div>
+      <video id="video" controls muted>
+        <source src="" type="video/mp4" />
+        Ton navigateur ne supporte pas la vidéo.
+      </video>
+      <audio id="recordedAudio" controls style="display:none;"></audio>
+      <div id="controls">
+        <button id="startRec">Démarrer l'enregistrement</button>
+        <button id="stopRec" disabled>Arrêter</button>
+        <button id="resetRec" disabled>Recommencer</button>
+        <button id="validateRec" disabled>C'est parfait</button>
+      </div>
+      <div class="voteButtons">
+        <button id="voteTop">TOP (+2)</button>
+        <button id="votePlus">+1</button>
+        <button id="voteMinus">-1</button>
+      </div>
+      <button id="nextPlayerBtn" style="display:none;">Joueur suivant</button>
     </div>
-    <div class="voteButtons">
-      <button id="voteTop">TOP (+2)</button>
-      <button id="votePlus">+1</button>
-      <button id="voteMinus">-1</button>
-    </div>
-    <button id="nextPlayerBtn" style="display:none;">Joueur suivant</button>
   </div>
 </div>
+
+<div id="toast"></div>
 
 <script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
 <script>
-  const socket = io("https://imitation-game-server-uz6b.onrender.com"); // Remplace par ton backend Render
-
-  let pseudo = prompt("Entrez votre pseudo :");
-  while (!pseudo || pseudo.trim().length < 2) {
-    pseudo = prompt("Pseudo invalide. Entrez votre pseudo :");
-  }
-  pseudo = pseudo.trim();
-
+  let pseudo = null;
   let gameStarted = false;
   let hasVoted = false;
   let mediaRecorder;
@@ -142,6 +224,8 @@
   let listenIndex = 0;
 
   // Elements DOM
+  const loginScreen = document.getElementById("loginScreen");
+  const gameScreen = document.getElementById("gameScreen");
   const playerList = document.getElementById("playerList");
   const lobbyPlayerList = document.getElementById("lobbyPlayerList");
   const startGameBtn = document.getElementById("startGameBtn");
@@ -158,18 +242,77 @@
   const votePlus = document.getElementById("votePlus");
   const voteMinus = document.getElementById("voteMinus");
   const nextPlayerBtn = document.getElementById("nextPlayerBtn");
+  const pseudoInput = document.getElementById("pseudoInput");
+  const joinBtn = document.getElementById("joinBtn");
 
-  socket.emit("joinGame", pseudo, (res) => {
-    if (!res.success) {
-      alert("Erreur : " + res.message);
-      location.reload();
-    } else {
-      alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
-      if (res.isAdmin) {
-        startGameBtn.style.display = "inline-block";
-      }
+  // Init socket (après pseudo)
+  let socket;
+
+  joinBtn.onclick = () => {
+    const val = pseudoInput.value.trim();
+    if (val.length < 2) {
+      alert("Pseudo invalide");
+      return;
     }
-  });
+    pseudo = val;
+
+    // Masquer login, afficher jeu
+    loginScreen.style.display = "none";
+    gameScreen.style.display = "flex";
+
+    // Init socket après pseudo validé
+    socket = io("https://imitation-game-server-uz6b.onrender.com");
+
+    socket.emit("joinGame", pseudo, (res) => {
+      if (!res.success) {
+        alert("Erreur : " + res.message);
+        location.reload();
+      } else {
+        alert(res.isAdmin ? "Vous êtes admin" : "Vous êtes joueur");
+        if (res.isAdmin) {
+          startGameBtn.style.display = "inline-block";
+        }
+      }
+    });
+
+    setupSocketEvents();
+  };
+
+  function setupSocketEvents() {
+    socket.on("playersUpdate", updatePlayerList);
+
+    socket.on("lobbyUpdate", ({ players, gameStarted: started }) => {
+      updateLobbyPlayers(players);
+      if (started) {
+        gameStarted = true;
+        showGame();
+      } else {
+        gameStarted = false;
+        showLobby();
+      }
+    });
+
+    socket.on("gameStarted", () => {
+      gameStarted = true;
+      showGame();
+    });
+
+    socket.on("roundUpdate", data => {
+      roundInfo.textContent = `Round ${data.currentRound} / ${data.totalRounds}`;
+      video.src = data.videoURL;
+      resetRecordingUI();
+    });
+
+    socket.on("startListeningPhase", ({ round, listenOrder: order }) => {
+      showToast(`Phase d'écoute du round ${round} commencée !`);
+      listenOrder = order;
+      listenIndex = 0;
+      showListeningPhase(round);
+    });
+
+    // Gestion votes
+    socket.on("playersUpdate", updatePlayerList);
+  }
 
   // Affiche liste joueurs avec score
   function updatePlayerList(players) {
@@ -223,36 +366,6 @@
     votePlus.style.display = show ? "inline-block" : "none";
     voteMinus.style.display = show ? "inline-block" : "none";
   }
-
-  // Event listeners
-
-  startGameBtn.onclick = () => {
-    socket.emit("startGame");
-  };
-
-  socket.on("playersUpdate", updatePlayerList);
-
-  socket.on("lobbyUpdate", ({ players, gameStarted: started }) => {
-    updateLobbyPlayers(players);
-    if (started) {
-      gameStarted = true;
-      showGame();
-    } else {
-      gameStarted = false;
-      showLobby();
-    }
-  });
-
-  socket.on("gameStarted", () => {
-    gameStarted = true;
-    showGame();
-  });
-
-  socket.on("roundUpdate", data => {
-    roundInfo.textContent = `Round ${data.currentRound} / ${data.totalRounds}`;
-    video.src = data.videoURL;
-    resetRecordingUI();
-  });
 
   // Enregistrement audio (simple)
 
@@ -326,21 +439,44 @@
     voteMinus.disabled = true;
   }
 
+  // Animation + toast helper
+  function showToast(message) {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.classList.add("show");
+    setTimeout(() => {
+      toast.classList.remove("show");
+    }, 2500);
+  }
+
+  function animateVoteButton(button) {
+    button.classList.add("vote-anim");
+    button.addEventListener("animationend", () => {
+      button.classList.remove("vote-anim");
+    }, { once: true });
+  }
+
   voteTop.onclick = () => {
     if (hasVoted) return alert("Vous avez déjà voté ce round.");
     socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "TOP" });
+    animateVoteButton(voteTop);
+    showToast("Vote TOP enregistré !");
     disableVoteButtons();
     hasVoted = true;
   };
   votePlus.onclick = () => {
     if (hasVoted) return alert("Vous avez déjà voté ce round.");
     socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "+1" });
+    animateVoteButton(votePlus);
+    showToast("Vote +1 enregistré !");
     disableVoteButtons();
     hasVoted = true;
   };
   voteMinus.onclick = () => {
     if (hasVoted) return alert("Vous avez déjà voté ce round.");
     socket.emit("vote", { voter: pseudo, target: pseudo, voteType: "-1" });
+    animateVoteButton(voteMinus);
+    showToast("Vote -1 enregistré !");
     disableVoteButtons();
     hasVoted = true;
   };
@@ -363,16 +499,14 @@
     recordedAudio.style.display = "none";
   }
 
-  // Gérer le passage à la phase écoute
+  // Phase écoute
 
-  socket.on("startListeningPhase", ({ round, listenOrder }) => {
-    alert(`Phase d'écoute du round ${round} commencée !`);
-    listenOrder = listenOrder;
+  socket.on("startListeningPhase", ({ round, listenOrder: order }) => {
+    showToast(`Phase d'écoute du round ${round} commencée !`);
+    listenOrder = order;
     listenIndex = 0;
     showListeningPhase(round);
   });
-
-  let listenIndex = 0;
 
   function showListeningPhase(round) {
     lobbyDiv.style.display = "none";
@@ -398,7 +532,7 @@
     nextPlayerBtn.onclick = () => {
       listenIndex++;
       if (listenIndex >= listenOrder.length) {
-        alert("Fin de la phase d'écoute !");
+        showToast("Fin de la phase d'écoute !");
         nextPlayerBtn.disabled = true;
         // Ici, tu peux déclencher la prochaine manche ou fin de jeu
       } else {
@@ -409,5 +543,6 @@
     };
   }
 </script>
+
 </body>
 </html>
