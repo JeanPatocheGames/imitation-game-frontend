@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<title>Imitation Game - Frontend corrigé</title>
+<title>Darons Imitation Game</title>
 <style>
   /* Design amélioré simple et propre */
   body {
@@ -125,10 +125,6 @@
   button:hover:not(:disabled) {
     background: #1e88e5;
   }
-  #nextPlayerBtn {
-    margin-top: 30px;
-  }
-
   /* Animation de glow au clic sur bouton vote */
   @keyframes voteGlow {
     0% {
@@ -147,8 +143,6 @@
   .vote-anim {
     animation: voteGlow 0.5s ease forwards;
   }
-
-  /* Toast notification style */
   #toast {
     position: fixed;
     bottom: 30px;
@@ -173,7 +167,7 @@
 <body>
 
 <div id="loginScreen">
-  <h1>Bienvenue au Imitation Game</h1>
+  <h1>Bienvenue au Darons Imitation Game</h1>
   <input type="text" id="pseudoInput" placeholder="Entrez votre pseudo" autocomplete="off" />
   <button id="joinBtn">Rejoindre la partie</button>
 </div>
@@ -193,10 +187,7 @@
 
     <div id="game" style="display:none; flex-direction: column; align-items: center;">
       <div id="roundInfo"></div>
-      <video id="video" controls muted>
-        <source src="" type="video/mp4" />
-        Ton navigateur ne supporte pas la vidéo.
-      </video>
+      <video id="video" controls muted></video>
       <audio id="recordedAudio" controls style="display:none;"></audio>
       <div id="controls">
         <button id="startRec">Démarrer l'enregistrement</button>
@@ -204,12 +195,11 @@
         <button id="resetRec" disabled>Recommencer</button>
         <button id="validateRec" disabled>C'est parfait</button>
       </div>
-      <div class="voteButtons">
+      <div class="voteButtons" style="display:none;">
         <button id="voteTop">TOP (+2)</button>
         <button id="votePlus">+1</button>
         <button id="voteMinus">-1</button>
       </div>
-      <button id="nextPlayerBtn" style="display:none;">Joueur suivant</button>
     </div>
   </div>
 </div>
@@ -245,11 +235,10 @@
   const voteTop = document.getElementById("voteTop");
   const votePlus = document.getElementById("votePlus");
   const voteMinus = document.getElementById("voteMinus");
-  const nextPlayerBtn = document.getElementById("nextPlayerBtn");
+
   const pseudoInput = document.getElementById("pseudoInput");
   const joinBtn = document.getElementById("joinBtn");
 
-  // Init socket (après pseudo)
   let socket;
 
   joinBtn.onclick = () => {
@@ -260,11 +249,9 @@
     }
     pseudo = val;
 
-    // Masquer login, afficher jeu
     loginScreen.style.display = "none";
     gameScreen.style.display = "flex";
 
-    // Init socket après pseudo validé
     socket = io("https://imitation-game-server-uz6b.onrender.com");
 
     socket.emit("joinGame", pseudo, (res) => {
@@ -302,32 +289,34 @@
     });
 
     socket.on("roundUpdate", data => {
-      roundInfo.textContent = `Round ${data.currentRound} / ${data.totalRounds}`;
+      roundInfo.textContent = `Round ${data.currentRound} / ${data.totalRounds} - Manche ${data.currentManche} / ${data.totalManches}`;
       video.src = data.videoURL;
-      resetRecordingUI();
+      video.muted = false;
+      recordedAudio.style.display = "none";
+      disableRecordButtons(false);
+      toggleVoteButtons(false);
     });
 
-    socket.on("startListeningPhase", ({ round, listenOrder: order }) => {
-      showToast(`Phase d'écoute du round ${round} commencée !`);
+    socket.on("startListeningPhase", ({ round, manche, listenOrder: order, listenIndex: index }) => {
       listenOrder = order;
-      listenIndex = 0;
-      showListeningPhase(round);
+      listenIndex = index;
+      roundInfo.textContent = `Phase d'écoute Round ${round} Manche ${manche} - Écoute de ${listenOrder[listenIndex].pseudo}`;
+      startListeningPhase();
     });
 
-    // Gestion votes
-    socket.on("playersUpdate", updatePlayerList);
+    socket.on("updateListeningPhase", ({ listenIndex: index }) => {
+      listenIndex = index;
+      roundInfo.textContent = `Phase d'écoute Round ${currentRound} Manche ${currentManche} - Écoute de ${listenOrder[listenIndex].pseudo}`;
+      startListeningPhase();
+    });
 
     socket.on("gameEnded", (finalScores) => {
-      alert("Partie terminée ! Voici le classement final:\n" + 
-        Object.entries(finalScores)
-          .map(([p, s]) => `${p} : ${s} pts`)
-          .join("\n")
-      );
+      alert("Partie terminée ! Classement final :\n" +
+        Object.entries(finalScores).map(([p, s]) => `${p}: ${s} pts`).join("\n"));
       location.reload();
     });
   }
 
-  // Affiche liste joueurs avec score
   function updatePlayerList(players) {
     playerList.innerHTML = "";
     players.forEach(p => {
@@ -338,7 +327,6 @@
     });
   }
 
-  // Affiche liste joueurs dans lobby (juste les pseudos)
   function updateLobbyPlayers(players) {
     lobbyPlayerList.innerHTML = "";
     players.forEach(pseudo => {
@@ -407,7 +395,6 @@
       alert("Vous devez enregistrer quelque chose d'abord !");
       return;
     }
-    // Envoi au backend
     const reader = new FileReader();
     reader.onload = () => {
       const base64Audio = reader.result;
@@ -427,62 +414,53 @@
     validateRec.disabled = disabled;
   }
 
-  // Phase d'écoute avec votes
+  function toggleVoteButtons(show) {
+    voteTop.style.display = show ? "inline-block" : "none";
+    votePlus.style.display = show ? "inline-block" : "none";
+    voteMinus.style.display = show ? "inline-block" : "none";
 
-  function showListeningPhase(round) {
+    voteTop.disabled = !show;
+    votePlus.disabled = !show;
+    voteMinus.disabled = !show;
+  }
+
+  // Phase d'écoute
+
+  function startListeningPhase() {
     showGame();
-    lobbyDiv.style.display = "none";
     gameDiv.style.display = "flex";
-    roundInfo.textContent = `Phase d'écoute Manche ${round} - ${listenOrder[listenIndex].pseudo}`;
 
-    // Video mute
     video.muted = true;
-    video.src = listenOrder[listenIndex].videoURL || "";
-
-    // Audio de l'imitation (joueur)
-    recordedAudio.src = `data:${listenOrder[listenIndex].audio}`;
+    video.src = ""; // Pas de vidéo à montrer ou tu peux mettre une vidéo neutre ou fond
+    recordedAudio.src = listenOrder[listenIndex].audio;
     recordedAudio.style.display = "block";
     recordedAudio.play();
 
-    // Afficher boutons vote
-    voteTop.disabled = false;
-    votePlus.disabled = false;
-    voteMinus.disabled = false;
-    nextPlayerBtn.style.display = "none";
+    toggleVoteButtons(true);
+    disableRecordButtons(true);
     hasVoted = false;
-
-    voteTop.onclick = () => vote("TOP");
-    votePlus.onclick = () => vote("+1");
-    voteMinus.onclick = () => vote("-1");
-
-    nextPlayerBtn.onclick = () => {
-      listenIndex++;
-      if (listenIndex >= listenOrder.length) {
-        // Fin de phase d'écoute, on désactive tout
-        showToast("Phase d'écoute terminée !");
-        gameDiv.style.display = "none";
-        lobbyDiv.style.display = "block";
-        nextPlayerBtn.style.display = "none";
-        voteTop.disabled = true;
-        votePlus.disabled = true;
-        voteMinus.disabled = true;
-        // Attente du round suivant côté serveur
-        return;
-      }
-      showListeningPhase(round);
-    };
   }
+
+  voteTop.onclick = () => vote("TOP");
+  votePlus.onclick = () => vote("+1");
+  voteMinus.onclick = () => vote("-1");
 
   function vote(type) {
     if (hasVoted) return;
     hasVoted = true;
+
     voteTop.disabled = true;
     votePlus.disabled = true;
     voteMinus.disabled = true;
-    nextPlayerBtn.style.display = "inline-block";
 
-    socket.emit("vote", { voter: pseudo, target: listenOrder[listenIndex].pseudo, voteType: type });
+    socket.emit("vote", {
+      voter: pseudo,
+      target: listenOrder[listenIndex].pseudo,
+      voteType: type
+    });
+
     showToast(`Vous avez voté ${type} pour ${listenOrder[listenIndex].pseudo}`);
+
     // animation glow
     [voteTop, votePlus, voteMinus].forEach(btn => btn.classList.remove("vote-anim"));
     const btn = type === "TOP" ? voteTop : type === "+1" ? votePlus : voteMinus;
@@ -497,14 +475,6 @@
     setTimeout(() => {
       toast.classList.remove("show");
     }, 2500);
-  }
-
-  function resetRecordingUI() {
-    disableRecordButtons(false);
-    recordedAudio.src = "";
-    recordedAudio.style.display = "none";
-    resetRec.disabled = true;
-    validateRec.disabled = true;
   }
 
   startGameBtn.onclick = () => {
