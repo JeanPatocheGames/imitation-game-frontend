@@ -178,11 +178,32 @@
   function showLobby() {
     lobbyDiv.style.display = "block";
     gameDiv.style.display = "none";
+    // Affiche boutons d'enregistrement, vote cachés en lobby
+    showRecordingControls(true);
+    showVoteButtons(false);
   }
 
   function showGame() {
     lobbyDiv.style.display = "none";
     gameDiv.style.display = "flex";
+    // Affiche boutons d'enregistrement et vote selon phase
+    showRecordingControls(true);
+    showVoteButtons(false);
+  }
+
+  // Contrôles d'enregistrement
+  function showRecordingControls(show) {
+    startRec.style.display = show ? "inline-block" : "none";
+    stopRec.style.display = show ? "inline-block" : "none";
+    resetRec.style.display = show ? "inline-block" : "none";
+    validateRec.style.display = show ? "inline-block" : "none";
+  }
+
+  // Contrôles votes
+  function showVoteButtons(show) {
+    voteTop.style.display = show ? "inline-block" : "none";
+    votePlus.style.display = show ? "inline-block" : "none";
+    voteMinus.style.display = show ? "inline-block" : "none";
   }
 
   // Event listeners
@@ -255,9 +276,19 @@
   };
 
   validateRec.onclick = () => {
-    socket.emit("validateImitation", pseudo);
-    alert("Imitation validée !");
-    validateRec.disabled = true;
+    if (audioChunks.length === 0) {
+      alert("Aucun enregistrement à valider !");
+      return;
+    }
+    const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Audio = reader.result.split(",")[1]; // On récupère la partie base64
+      socket.emit("validateImitation", { pseudo, audio: base64Audio });
+      alert("Imitation validée !");
+      validateRec.disabled = true;
+    };
+    reader.readAsDataURL(audioBlob);
   };
 
   // Votes
@@ -296,6 +327,32 @@
     voteTop.disabled = false;
     votePlus.disabled = false;
     voteMinus.disabled = false;
+
+    // Par défaut on montre l’UI d’enregistrement, cache votes
+    showRecordingControls(true);
+    showVoteButtons(false);
+  }
+
+  // Gérer le passage à la phase écoute
+
+  socket.on("startListeningPhase", ({ round }) => {
+    alert(`Phase d'écoute du round ${round} commencée !`);
+    showListeningPhase(round);
+  });
+
+  function showListeningPhase(round) {
+    lobbyDiv.style.display = "none";
+    gameDiv.style.display = "flex";
+
+    roundInfo.textContent = `Phase d'écoute - Round ${round}`;
+
+    // On cache les contrôles d'enregistrement
+    showRecordingControls(false);
+
+    // On affiche les boutons de vote
+    showVoteButtons(true);
+
+    // TODO : afficher la liste des enregistrements audio des joueurs (à recevoir du backend)
   }
 </script>
 </body>
