@@ -4,8 +4,7 @@
 <meta charset="UTF-8" />
 <title>Darons Imitation - Frontend</title>
 <style>
-  /* Style simple, moderne */
-  @import url('https://fonts.googleapis.com/css2?family=Poppins&display=swap');
+  /* Style simple et moderne */
   body {
     font-family: 'Poppins', Arial, sans-serif;
     margin: 0; padding: 0;
@@ -20,7 +19,7 @@
     background: rgba(0,0,0,0.75);
     border-radius: 12px;
     padding: 30px 40px;
-    width: 360px;
+    width: 350px;
     box-shadow: 0 0 30px rgba(0,0,0,0.6);
     text-align: center;
   }
@@ -129,6 +128,8 @@
   #nextPlayerBtn {
     margin-top: 30px;
   }
+
+  /* Animation glow au clic sur bouton vote */
   @keyframes voteGlow {
     0% {
       box-shadow: 0 0 0px rgba(255, 255, 255, 0);
@@ -146,6 +147,8 @@
   .vote-anim {
     animation: voteGlow 0.5s ease forwards;
   }
+
+  /* Toast notification style */
   #toast {
     position: fixed;
     bottom: 30px;
@@ -201,7 +204,7 @@
         <button id="resetRec" disabled>Recommencer</button>
         <button id="validateRec" disabled>C'est parfait</button>
       </div>
-      <div class="voteButtons" style="display:none;">
+      <div class="voteButtons">
         <button id="voteTop">TOP (+2)</button>
         <button id="votePlus">+1</button>
         <button id="voteMinus">-1</button>
@@ -224,6 +227,7 @@
   let listenOrder = [];
   let listenIndex = 0;
 
+  // Elements DOM
   const loginScreen = document.getElementById("loginScreen");
   const gameScreen = document.getElementById("gameScreen");
   const playerList = document.getElementById("playerList");
@@ -245,6 +249,7 @@
   const pseudoInput = document.getElementById("pseudoInput");
   const joinBtn = document.getElementById("joinBtn");
 
+  // Init socket (après pseudo)
   let socket;
 
   joinBtn.onclick = () => {
@@ -255,9 +260,11 @@
     }
     pseudo = val;
 
+    // Masquer login, afficher jeu
     loginScreen.style.display = "none";
     gameScreen.style.display = "flex";
 
+    // Init socket après pseudo validé
     socket = io("https://imitation-game-server-uz6b.onrender.com");
 
     socket.emit("joinGame", pseudo, (res) => {
@@ -295,31 +302,34 @@
     });
 
     socket.on("roundUpdate", data => {
-      roundInfo.textContent = `Round ${data.currentRound} / ${data.totalRounds} - Manche ${data.currentManche} / ${data.totalManches} (Phase imitation)`;
-      video.src = data.videoURL;
-      video.muted = false;
-      recordedAudio.style.display = "none";
-      recordedAudio.src = "";
-      resetRecordingUI();
-      showControls(true);
-      showVoteButtons(false);
-      nextPlayerBtn.style.display = "none";
+      roundInfo.textContent = `Round ${data.currentRound} / ${data.totalRounds} - Manche ${data.currentManche} / ${data.totalManches}`;
+
+      // Phase imitation : vidéo avec son, cache audio participant
+      if (data.phase === "imitation") {
+        video.muted = false;
+        video.src = data.videoURL;
+        recordedAudio.style.display = "none";
+        resetRecordingUI();
+        showGameControls(true);
+        showVoteButtons(false);
+        nextPlayerBtn.style.display = "none";
+      }
     });
 
     socket.on("startListeningPhase", ({ round, manche, listenOrder: order, listenIndex: index }) => {
-      showToast(`Phase d'écoute Manche ${manche} Round ${round} commencée !`);
       listenOrder = order;
       listenIndex = index;
-      showListeningPhase(round, manche);
+      showToast(`Phase d'écoute Manche ${manche} - écoute de ${listenOrder[listenIndex].pseudo}`);
+      showListeningPhase(manche);
     });
 
     socket.on("updateListeningPhase", ({ listenIndex: index }) => {
       listenIndex = index;
-      showListeningPhase(null, null, true);
+      showListeningPhase();
     });
 
     socket.on("gameEnded", (finalScores) => {
-      alert("Partie terminée ! Voici le classement final:\n" +
+      alert("Partie terminée ! Voici le classement final:\n" + 
         Object.entries(finalScores)
           .map(([p, s]) => `${p} : ${s} pts`)
           .join("\n")
@@ -328,6 +338,7 @@
     });
   }
 
+  // Affiche liste joueurs avec score
   function updatePlayerList(players) {
     playerList.innerHTML = "";
     players.forEach(p => {
@@ -338,6 +349,7 @@
     });
   }
 
+  // Affiche liste joueurs dans lobby (juste les pseudos)
   function updateLobbyPlayers(players) {
     lobbyPlayerList.innerHTML = "";
     players.forEach(pseudo => {
@@ -357,25 +369,8 @@
     gameDiv.style.display = "flex";
   }
 
-  // Contrôle affichage boutons enregistrement
-  function showControls(show) {
-    startRec.disabled = !show;
-    stopRec.disabled = true;
-    resetRec.disabled = true;
-    validateRec.disabled = true;
-    recordedAudio.style.display = "none";
-    resetRec.style.display = show ? "inline-block" : "none";
-    validateRec.style.display = show ? "inline-block" : "none";
-    startRec.style.display = show ? "inline-block" : "none";
-    stopRec.style.display = "inline-block";
-  }
-
-  function showVoteButtons(show) {
-    const voteDiv = voteTop.parentElement;
-    voteDiv.style.display = show ? "block" : "none";
-  }
-
   // Enregistrement audio
+
   startRec.onclick = async () => {
     if (!navigator.mediaDevices) {
       alert("Votre navigateur ne supporte pas la capture audio.");
@@ -423,6 +418,7 @@
       alert("Vous devez enregistrer quelque chose d'abord !");
       return;
     }
+    // Envoi au backend
     const reader = new FileReader();
     reader.onload = () => {
       const base64Audio = reader.result;
@@ -442,73 +438,70 @@
     validateRec.disabled = disabled;
   }
 
-  // Phase d'écoute et votes
+  // Phase d'écoute avec votes
 
-  function showListeningPhase(round, manche, justUpdate=false) {
+  function showListeningPhase(manche) {
     showGame();
     lobbyDiv.style.display = "none";
     gameDiv.style.display = "flex";
+    roundInfo.textContent = `Phase d'écoute Manche ${manche} - Écoute de ${listenOrder[listenIndex].pseudo}`;
 
-    if (!justUpdate) {
-      roundInfo.textContent = `Phase d'écoute Manche ${manche} - ${listenOrder[listenIndex].pseudo}`;
-    }
-
-    // Afficher vidéo mute
+    // Vidéo muette
     video.muted = true;
+    video.src = listenOrder[listenIndex].videoURL || ""; // ATTENTION : videoURL doit être transmis dans listenOrder si besoin
 
-    // Pour la vidéo d'origine on reprend l'URL du round + manche
-    // mais on ne l'a pas côté client, donc on doit demander ou garder côté serveur
-
-    // Afficher l'audio enregistré (imitation)
-    recordedAudio.style.display = "block";
+    // Audio imitation joueur
     recordedAudio.src = listenOrder[listenIndex].audio;
+    recordedAudio.style.display = "block";
     recordedAudio.play();
 
-    showControls(false);
-    showVoteButtons(true);
+    // Affichage des boutons vote
+    voteTop.disabled = false;
+    votePlus.disabled = false;
+    voteMinus.disabled = false;
     nextPlayerBtn.style.display = "none";
-
     hasVoted = false;
 
     voteTop.onclick = () => vote("TOP");
     votePlus.onclick = () => vote("+1");
     voteMinus.onclick = () => vote("-1");
+
+    nextPlayerBtn.onclick = () => {
+      listenIndex++;
+      if (listenIndex >= listenOrder.length) {
+        showToast("Phase d'écoute terminée !");
+        gameDiv.style.display = "none";
+        lobbyDiv.style.display = "block";
+        nextPlayerBtn.style.display = "none";
+        voteTop.disabled = true;
+        votePlus.disabled = true;
+        voteMinus.disabled = true;
+        return;
+      }
+      showListeningPhase(manche);
+    };
   }
 
   function vote(type) {
     if (hasVoted) return;
     hasVoted = true;
 
+    // TOP utilisable une seule fois par manche, le backend le valide déjà
     voteTop.disabled = true;
     votePlus.disabled = true;
     voteMinus.disabled = true;
-
     nextPlayerBtn.style.display = "inline-block";
 
     socket.emit("vote", { voter: pseudo, target: listenOrder[listenIndex].pseudo, voteType: type });
     showToast(`Vous avez voté ${type} pour ${listenOrder[listenIndex].pseudo}`);
 
-    // animation glow
+    // Animation glow
     [voteTop, votePlus, voteMinus].forEach(btn => btn.classList.remove("vote-anim"));
     const btn = type === "TOP" ? voteTop : type === "+1" ? votePlus : voteMinus;
     btn.classList.add("vote-anim");
   }
 
-  nextPlayerBtn.onclick = () => {
-    listenIndex++;
-    if (listenIndex >= listenOrder.length) {
-      showToast("Fin de la phase d'écoute, en attente du prochain round...");
-      gameDiv.style.display = "none";
-      lobbyDiv.style.display = "block";
-      nextPlayerBtn.style.display = "none";
-      showVoteButtons(false);
-      // Le passage au round suivant est géré par le backend dès que tous ont voté ou timer expiré
-      return;
-    }
-    showListeningPhase(null, null);
-  };
-
-  // Toast notifications
+  // Toast notification
   function showToast(msg) {
     const toast = document.getElementById("toast");
     toast.textContent = msg;
@@ -524,6 +517,19 @@
     recordedAudio.style.display = "none";
     resetRec.disabled = true;
     validateRec.disabled = true;
+  }
+
+  function showGameControls(show) {
+    startRec.style.display = show ? "inline-block" : "none";
+    stopRec.style.display = show ? "inline-block" : "none";
+    resetRec.style.display = show ? "inline-block" : "none";
+    validateRec.style.display = show ? "inline-block" : "none";
+  }
+
+  function showVoteButtons(show) {
+    voteTop.style.display = show ? "inline-block" : "none";
+    votePlus.style.display = show ? "inline-block" : "none";
+    voteMinus.style.display = show ? "inline-block" : "none";
   }
 
   startGameBtn.onclick = () => {
