@@ -34,7 +34,6 @@
     font-size: 17px;
     border-radius: 8px;
     border: none;
-    box-sizing: border-box;
   }
   #loginScreen button {
     background: #42a5f5;
@@ -102,8 +101,6 @@
     font-size: 28px;
     margin-bottom: 20px;
     font-weight: 700;
-    text-align: center;
-    min-height: 38px;
   }
 
   #videoContainer {
@@ -128,7 +125,6 @@
     max-width: 720px;
     outline: none;
     border-radius: 6px;
-    display: none;
   }
 
   #controls, .voteButtons {
@@ -156,6 +152,7 @@
     background: #1e88e5;
   }
 
+  /* Glow animation for vote buttons */
   @keyframes voteGlow {
     0% {
       box-shadow: 0 0 0 rgba(255, 255, 255, 0);
@@ -174,6 +171,7 @@
     animation: voteGlow 0.5s ease forwards;
   }
 
+  /* Toast notification style */
   #toast {
     position: fixed;
     bottom: 30px;
@@ -223,7 +221,7 @@
         <iframe id="ytVideo" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
       </div>
 
-      <audio id="playerAudio" controls></audio>
+      <audio id="playerAudio" controls style="display:none;"></audio>
 
       <div id="controls">
         <button id="startRec">Démarrer l'enregistrement</button>
@@ -255,9 +253,9 @@
 
   let listenOrder = [];
   let listenIndex = 0;
-  let usedTopVotes = 0;
+  let usedTopVotes = 0; // Limite 1 TOP par manche
 
-  // DOM Elements
+  // Elements DOM
   const loginScreen = document.getElementById("loginScreen");
   const gameScreen = document.getElementById("gameScreen");
   const playerList = document.getElementById("playerList");
@@ -280,7 +278,23 @@
   const joinBtn = document.getElementById("joinBtn");
   const voteButtonsDiv = document.querySelector('.voteButtons');
 
-  let socket;
+  // Convertit url youtube shorts ou normales vers embed youtube
+  function convertToEmbedUrl(url) {
+    try {
+      let vidId = null;
+      if (url.includes("youtube.com/shorts/")) {
+        vidId = url.split("youtube.com/shorts/")[1].split(/[?&]/)[0];
+      } else if (url.includes("youtube.com/watch?v=")) {
+        vidId = url.split("v=")[1].split(/[?&]/)[0];
+      } else if (url.includes("youtu.be/")) {
+        vidId = url.split("youtu.be/")[1].split(/[?&]/)[0];
+      }
+      if (vidId) return `https://www.youtube.com/embed/${vidId}`;
+      return url;
+    } catch {
+      return url;
+    }
+  }
 
   joinBtn.onclick = () => {
     const val = pseudoInput.value.trim();
@@ -341,11 +355,11 @@
       ytVideo.src = "";
 
       if(data.phase === "imitation") {
-        // Vidéo muette YouTube à imiter
+        // Affiche vidéo youtube muette à imiter
         ytVideo.src = convertToEmbedUrl(data.videoURL) + "?autoplay=1&mute=1&enablejsapi=1";
         showRecordingControls(true);
       } else {
-        // Phase écoute - pas de contrôle enregistrement
+        // Phase écoute (sera gérée via autre event)
         showRecordingControls(false);
       }
     });
@@ -361,20 +375,38 @@
       showGame(true);
       roundInfo.textContent = `Phase d'écoute - Round ${round} Manche ${manche} - Écoute de ${listenOrder[listenIndex].pseudo}`;
 
+      // Affiche vidéo youtube muette
       ytVideo.src = convertToEmbedUrl(listenOrder[listenIndex].videoURL) + "?autoplay=1&mute=1&enablejsapi=1";
 
+      // Joue l’audio du participant
       playerAudio.src = listenOrder[listenIndex].audio;
       playerAudio.style.display = "block";
       playerAudio.play();
 
       resetVoteButtons();
 
+      voteTop.disabled = (usedTopVotes >= 1);
+      votePlus.disabled = false;
+      voteMinus.disabled = false;
+
       voteTop.onclick = () => vote("TOP");
       votePlus.onclick = () => vote("+1");
       voteMinus.onclick = () => vote("-1");
 
       nextPlayerBtn.style.display = "none";
-      nextPlayerBtn.onclick = null;
+      nextPlayerBtn.onclick = () => {
+        listenIndex++;
+        if(listenIndex >= listenOrder.length) {
+          showToast("Phase d'écoute terminée !");
+          voteButtonsDiv.style.display = "none";
+          nextPlayerBtn.style.display = "none";
+          playerAudio.style.display = "none";
+          ytVideo.src = "";
+          showLobby(true);
+          return;
+        }
+        showListeningPhase();
+      };
     });
 
     socket.on("updateListeningPhase", ({ listenIndex: idx }) => {
@@ -438,24 +470,6 @@
     validateRec.style.display = show ? "inline-block" : "none";
   }
 
-  // Convertit url youtube shorts ou normales vers embed youtube
-  function convertToEmbedUrl(url) {
-    try {
-      let vidId = null;
-      if(url.includes("youtube.com/shorts/")) {
-        vidId = url.split("youtube.com/shorts/")[1].split(/[?&]/)[0];
-      } else if(url.includes("youtube.com/watch?v=")) {
-        vidId = url.split("v=")[1].split(/[?&]/)[0];
-      } else if(url.includes("youtu.be/")) {
-        vidId = url.split("youtu.be/")[1].split(/[?&]/)[0];
-      }
-      if(vidId) return `https://www.youtube.com/embed/${vidId}`;
-      return url;
-    } catch {
-      return url;
-    }
-  }
-
   // Enregistrement audio
 
   startRec.onclick = async () => {
@@ -505,6 +519,10 @@
       alert("Vous devez enregistrer quelque chose d'abord !");
       return;
     }
+    if (listenOrder[listenIndex] && listenOrder[listenIndex].pseudo === pseudo) {
+      showToast("Vous ne pouvez pas voter pour vous-même !");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const base64Audio = reader.result;
@@ -527,8 +545,6 @@
   // Phase écoute + votes
 
   function showListeningPhase() {
-    if(listenIndex >= listenOrder.length) return;
-
     const currentPlayer = listenOrder[listenIndex];
     roundInfo.textContent = `Phase d'écoute - Écoute de ${currentPlayer.pseudo}`;
 
@@ -555,6 +571,12 @@
 
   function vote(type) {
     if(hasVoted) return;
+
+    if (listenOrder[listenIndex].pseudo === pseudo) {
+      showToast("Vous ne pouvez pas voter pour vous-même !");
+      return;
+    }
+
     hasVoted = true;
 
     if(type === "TOP") usedTopVotes++;
