@@ -744,21 +744,7 @@
     });
   }
 
-  socket && socket.on("updateListeningPhase", ({ listenIndex: idx }) => {
-    listenIndex = idx;
-    if (listenIndex >= listenOrder.length) {
-      showToast("Phase d'écoute terminée !");
-      voteButtonsDiv.style.display = "none";
-      nextPlayerBtn.style.display = "none";
-      playerAudio.style.display = "none";
-      ytVideo.src = "";
-      showLobby(true);
-      resetVoteTimer();
-      return;
-    }
-    showListeningPhase();
-  });
-
+ 
   nextPlayerBtn.onclick = () => {
     listenIndex++;
     if (listenIndex >= listenOrder.length) {
